@@ -26,7 +26,8 @@ and open the "Network" address it prints (e.g. http://192.168.x.x:5173) on the t
 
 ## Online
 Live at **https://blue-world-tau.vercel.app** (Vercel project `blue-world`, personal team "Mathew's projects").
-To publish changes: `npx vercel deploy --prod --scope mathews-projects-b0ec1f40`
+Source: https://github.com/Mat-V-Garcia/blue-world. **Every push to `main` redeploys the live site automatically** (Vercel is connected to the repo); pushes to other branches get their own preview link.
+Manual deploy, if ever needed: `npx vercel deploy --prod --scope mathews-projects-b0ec1f40`
 
 ## Where things live
 - `src/world.js` — terrain, sky, props, colliders and the 10 pebble spots
