@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Blue World</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div class="counter">
+      <img src="/assets/pebble.png" alt="" onerror="this.style.display='none'" />
+      <span id="count">0</span><span class="of">/10</span>
+    </div>
+    <div class="hearts" id="hearts"></div>
+    <div class="timer" id="timer">0:00</div>
+    <div class="hint" id="hint">WASD move · Mouse look · Space jump (land on tarantulas!) · F bite · Shift sprint · E push-ups</div>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div id="title" class="screen">
+    <div class="art" style="background-image:url('/assets/title.jpg')"></div>
+    <div class="panel">
+      <h1>Blue World</h1>
+      <p class="level">Level 1 · The Desert</p>
+      <p>You are a tiny western fence lizard. Somewhere out in the dunes, ten golden pebbles are glinting in the sun. Find them all!</p>
+      <button id="play">Play</button>
+      <p class="small mouse-only">Climb rocks, fences and mesas · Watch out for tarantulas: jump on them or bite with F · Click the game to look around</p>
+      <p class="small touch-only">Left thumb: move (push far to run) · Right thumb: drag to look · Jump on tarantulas or tap Bite</p>
+    </div>
+  </div>
+
+  <div id="win" class="screen hidden">
+    <div class="panel">
+      <h1>All 10 pebbles!</h1>
+      <p>Your time: <b id="wintime">0:00</b></p>
+      <p class="small">Do a victory push-up. You earned it.</p>
+      <button id="again">Play again</button>
+    </div>
+  </div>
+
+  <!-- Tablet / phone controls (shown in touch mode) -->
+  <div id="touch" class="hidden">
+    <div id="stick-base"><div id="stick-knob"></div></div>
+    <div class="tbtns">
+      <button class="tbtn small" id="btn-push" aria-label="Push-ups">💪</button>
+      <button class="tbtn" id="btn-bite" aria-label="Bite">Bite</button>
+      <button class="tbtn big" id="btn-jump" aria-label="Jump">Jump</button>
+    </div>
+    <button class="tbtn fs" id="btn-fs" aria-label="Full screen">⛶</button>
+  </div>
+
+  <div id="paused" class="hidden">Click to look around</div>
+  <div id="flash"></div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

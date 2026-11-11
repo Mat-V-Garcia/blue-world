@@ -1,0 +1,8 @@
+# Only the game source goes to Vercel; it builds with `vite build`.
+art/
+dist/
+node_modules/
+docs/
+.claude/
+.env*
+.vercel/

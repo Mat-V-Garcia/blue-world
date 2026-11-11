@@ -1,0 +1,10 @@
+# dependencies and build output (recreated by `npm install` / `npm run build`)
+node_modules/
+dist/
+
+# Vercel link + local secrets (never commit)
+.vercel
+.env*
+
+# macOS
+.DS_Store
