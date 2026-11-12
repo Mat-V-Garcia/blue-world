@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { terrainHeight, footprint, WORLD_RADIUS } from './world.js';
+import { terrainHeight, footprint, worldRadius } from './world.js';
 import { toon } from './materials.js';
 
 // ---------- Tuning ----------
@@ -70,10 +70,15 @@ export function createSimpleSpider() {
 
 // ---------- Tarantula manager ----------
 // makeSpider(): returns { root, update(dt, speed) } — either the 3D model or the stand-in.
-export function createTarantulas(scene, colliders, pebbleSpots, makeSpider) {
+// cfg (from the level): { kind, homes?: [[x,z]...], count?, chaseSpeed?, wanderSpeed?, notice? }
+export function createTarantulas(scene, colliders, pebbleSpots, makeSpider, cfg = {}) {
+  const CHASE = cfg.chaseSpeed ?? CHASE_SPEED, WANDER = cfg.wanderSpeed ?? WANDER_SPEED;
+  const NOTICE = cfg.notice ?? NOTICE_RANGE;
+  // body size for touching / stomping (pigeons are bigger than tarantulas)
+  const R = cfg.radius ?? SPIDER_RADIUS, H = cfg.height ?? SPIDER_HEIGHT;
   const clearOf = (x, z) => colliders.every((c) => footprint(c, x, z).dist > 1.2)
     && pebbleSpots.every((p) => Math.hypot(p.x - x, p.z - z) > 4);
-  const homes = HOMES.filter(([x, z]) => clearOf(x, z)).slice(0, COUNT);
+  const homes = (cfg.homes || HOMES).filter(([x, z]) => clearOf(x, z)).slice(0, cfg.count ?? COUNT);
 
   const spiders = homes.map(([hx, hz], i) => {
     const v = makeSpider();
@@ -114,15 +119,15 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider) {
     for (const c of colliders) {
       if (c.bottom > -50) continue;
       const f = footprint(c, nx, nz, s.pos.y + 0.1);
-      if (f.dist < SPIDER_RADIUS) {
-        nx += f.nx * (SPIDER_RADIUS - f.dist);
-        nz += f.nz * (SPIDER_RADIUS - f.dist);
+      if (f.dist < R) {
+        nx += f.nx * (R - f.dist);
+        nz += f.nz * (R - f.dist);
         // slide sideways round the obstacle
         nx += -f.nz * step * 0.6; nz += f.nx * step * 0.6;
       }
     }
     const r = Math.hypot(nx, nz);
-    if (r > WORLD_RADIUS - 2) { nx *= (WORLD_RADIUS - 2) / r; nz *= (WORLD_RADIUS - 2) / r; }
+    if (r > worldRadius() - 2) { nx *= (worldRadius() - 2) / r; nz *= (worldRadius() - 2) / r; }
     s.speed = Math.hypot(nx - s.pos.x, nz - s.pos.z) / Math.max(dt, 1e-4);
     const want = Math.atan2(nx - s.pos.x, nz - s.pos.z);
     let dy = want - s.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
@@ -156,7 +161,7 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider) {
         const toP = Math.hypot(player.pos.x - s.pos.x, player.pos.z - s.pos.z);
         const fromHome = Math.hypot(player.pos.x - s.home.x, player.pos.z - s.home.y);
         const playerLow = player.pos.y - terrainHeight(player.pos.x, player.pos.z) < 1.5; // can't reach you up high
-        if (s.state !== 'chase' && toP < NOTICE_RANGE && playerLow) s.state = 'chase';
+        if (s.state !== 'chase' && toP < NOTICE && playerLow) s.state = 'chase';
         if (s.state === 'chase' && (fromHome > GIVE_UP_RANGE || !playerLow)) s.state = 'return';
 
         if (s.pause > 0) {
@@ -164,14 +169,14 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider) {
           s.pause -= dt;
           if (s.pause > 0.8) {
             const ax = s.pos.x - player.pos.x, az = s.pos.z - player.pos.z, ad = Math.hypot(ax, az) || 1;
-            moveTo(s, s.pos.x + (ax / ad) * 2, s.pos.z + (az / ad) * 2, WANDER_SPEED * 1.6, dt);
+            moveTo(s, s.pos.x + (ax / ad) * 2, s.pos.z + (az / ad) * 2, WANDER * 1.6, dt);
           } else s.speed = 0;
         } else if (s.state === 'chase') {
           // close in, but stop at touching distance instead of walking on top of you
-          if (toP > SPIDER_RADIUS + 0.25) moveTo(s, player.pos.x, player.pos.z, CHASE_SPEED, dt);
+          if (toP > R + 0.25) moveTo(s, player.pos.x, player.pos.z, CHASE, dt);
           else s.speed = 0;
         } else if (s.state === 'return') {
-          if (moveTo(s, s.home.x, s.home.y, WANDER_SPEED * 1.5, dt) < 0.5) s.state = 'wander';
+          if (moveTo(s, s.home.x, s.home.y, WANDER * 1.5, dt) < 0.5) s.state = 'wander';
         } else {
           s.retarget -= dt;
           if (s.retarget <= 0) {
@@ -179,14 +184,14 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider) {
             s.target.set(s.home.x + Math.cos(a) * r, s.home.y + Math.sin(a) * r);
             s.retarget = 2 + Math.random() * 3;
           }
-          if (moveTo(s, s.target.x, s.target.y, WANDER_SPEED, dt) < 0.1) s.speed = 0;
+          if (moveTo(s, s.target.x, s.target.y, WANDER, dt) < 0.1) s.speed = 0;
         }
 
         // --- touch the lizard? ---
         const dh = Math.hypot(player.pos.x - s.pos.x, player.pos.z - s.pos.z);
         const above = player.pos.y - s.pos.y;
-        if (dh < SPIDER_RADIUS + 0.3 && above < SPIDER_HEIGHT + 0.15 && above > -0.4) {
-          if (player.velY < -1.5 && above > SPIDER_HEIGHT * 0.45) {
+        if (dh < R + 0.3 && above < H + 0.15 && above > -0.4) {
+          if (player.velY < -1.5 && above > H * 0.45) {
             defeat(s); result = 'stomp';
           } else if (canBeHurt && !result) {
             result = 'hurt'; from = s.pos.clone();
@@ -215,7 +220,7 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider) {
       for (const s of spiders) {
         if (!s.alive) continue;
         const dx = s.pos.x - pos.x, dz = s.pos.z - pos.z, d = Math.hypot(dx, dz);
-        if (d < BITE_RANGE + SPIDER_RADIUS && Math.abs(s.pos.y - pos.y) < 0.8 && (dx * fx + dz * fz) / (d || 1) > 0.35) {
+        if (d < BITE_RANGE + R && Math.abs(s.pos.y - pos.y) < 0.8 && (dx * fx + dz * fz) / (d || 1) > 0.35) {
           defeat(s); n++;
         }
       }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { terrainHeight, footprint, WORLD_RADIUS } from './world.js';
+import { terrainHeight, footprint, worldRadius } from './world.js';
 
 const RADIUS = 0.3;        // body radius for collisions
 const HEIGHT = 0.45;       // lizard height
@@ -143,7 +143,7 @@ export class Player {
     }
     // stay inside the world
     const r = Math.hypot(nx, nz);
-    if (r > WORLD_RADIUS) { nx *= WORLD_RADIUS / r; nz *= WORLD_RADIUS / r; }
+    if (r > worldRadius()) { nx *= worldRadius() / r; nz *= worldRadius() / r; }
     const moved = Math.hypot(nx - this.pos.x, nz - this.pos.z);
     this.speed = moved / Math.max(dt, 1e-4);
     this.pos.x = nx; this.pos.z = nz;

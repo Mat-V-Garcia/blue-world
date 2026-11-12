@@ -1,6 +1,13 @@
 # Blue World
 
-A cosy 3D browser game: you're a western fence lizard. In Level 1, a desert, you collect 10 golden pebbles.
+A cosy 3D browser game: you're a western fence lizard collecting 10 golden pebbles per level.
+
+- **Level 1 · The Desert** — dunes, mesas, cacti, fences and an old wagon. Enemies: tarantulas.
+- **Level 2 · Fullerton Shops** — a sunny Southern California shopping center inspired by Fullerton, CA
+  (all shop names are made up): storefronts, a clock tower, a fountain, palms, an orange tree, cafés,
+  carts and a parking lot. Enemies: pigeons.
+
+Finishing a level unlocks the next (saved in the browser). The title screen has a level picker.
 
 ## Run
 ```
@@ -30,12 +37,14 @@ Source: https://github.com/Mat-V-Garcia/blue-world. **Every push to `main` redep
 Manual deploy, if ever needed: `npx vercel deploy --prod --scope mathews-projects-b0ec1f40`
 
 ## Where things live
-- `src/world.js` — terrain, sky, props, colliders and the 10 pebble spots
+- `src/levels/` — one file per level (`desert.js`, `mall.js`) plus `index.js`, the level list and unlocking
+- `src/world.js` — shared world kit: active ground, painted sky, rock shapes, collider maths
 - `src/lizard.js` — the simple block-built lizard (fallback if the 3D model fails to load)
 - `src/player.js` — movement, jumping, climbing
 - `src/pebbles.js` — pebbles, sparkles, dust puffs
-- `src/enemies.js` — tarantulas: wandering, chasing, stomp/bite, respawn
+- `src/enemies.js` — enemies (tarantulas, pigeons): wandering, chasing, stomp/bite, respawn
 - `src/spiderModel.js` — the Magnific 3D tarantula and its leg animation
+- `src/pigeonModel.js` — the Magnific 3D pigeon (head-bob walk, pecking, wing flaps)
 - `src/lizardModel.js` — the Magnific 3D fence lizard and its animation
 - `src/touch.js` — tablet controls: joystick, look, Jump/Bite/push-up buttons
 - `src/main.js` — game loop, camera, HUD

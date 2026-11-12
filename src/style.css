@@ -85,3 +85,12 @@ body.touch-mode .timer { top: calc(18px + env(safe-area-inset-top)); }
 .touch-only { display: none; }
 body.touch-mode .touch-only { display: block; }
 body.touch-mode .mouse-only { display: none; }
+
+/* ---------- Level picker / win buttons ---------- */
+.levels { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+.lvl { font-size: 15px; padding: 7px 14px; background: #fff; color: #4a2f22; box-shadow: 0 3px 0 #d79a6a; border: 2px solid #f0d9c2; }
+.lvl span { font-weight: 600; }
+.lvl.here { background: #1d6fb0; color: #fff; border-color: #1d6fb0; box-shadow: 0 3px 0 #134c79; }
+.lvl[disabled] { opacity: .5; cursor: not-allowed; filter: grayscale(.6); }
+.win-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+button.secondary { background: #fff; color: #1d6fb0; box-shadow: 0 5px 0 #d79a6a; }

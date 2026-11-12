@@ -20,7 +20,7 @@
     </div>
     <div class="hearts" id="hearts"></div>
     <div class="timer" id="timer">0:00</div>
-    <div class="hint" id="hint">WASD move · Mouse look · Space jump (land on tarantulas!) · F bite · Shift sprint · E push-ups</div>
+    <div class="hint" id="hint">WASD move · Mouse look · Space jump (land on enemies!) · F bite · Shift sprint · E push-ups</div>
     <div class="toast" id="toast"></div>
   </div>
 
@@ -28,11 +28,12 @@
     <div class="art" style="background-image:url('/assets/title.jpg')"></div>
     <div class="panel">
       <h1>Blue World</h1>
-      <p class="level">Level 1 · The Desert</p>
-      <p>You are a tiny western fence lizard. Somewhere out in the dunes, ten golden pebbles are glinting in the sun. Find them all!</p>
+      <p class="level" id="level-name">Level 1 · The Desert</p>
+      <p id="level-intro">You are a tiny western fence lizard. Find the ten golden pebbles!</p>
       <button id="play">Play</button>
-      <p class="small mouse-only">Climb rocks, fences and mesas · Watch out for tarantulas: jump on them or bite with F · Click the game to look around</p>
-      <p class="small touch-only">Left thumb: move (push far to run) · Right thumb: drag to look · Jump on tarantulas or tap Bite</p>
+      <div class="levels" id="levels"></div>
+      <p class="small mouse-only">Climb almost anything · Jump on enemies or bite them with F · Click the game to look around</p>
+      <p class="small touch-only">Left thumb: move (push far to run) · Right thumb: drag to look · Jump on enemies or tap Bite</p>
     </div>
   </div>
 
@@ -40,8 +41,11 @@
     <div class="panel">
       <h1>All 10 pebbles!</h1>
       <p>Your time: <b id="wintime">0:00</b></p>
-      <p class="small">Do a victory push-up. You earned it.</p>
-      <button id="again">Play again</button>
+      <p class="small" id="win-msg">Do a victory push-up. You earned it.</p>
+      <div class="win-btns">
+        <button id="next" class="hidden">Next level</button>
+        <button id="again" class="secondary">Play again</button>
+      </div>
     </div>
   </div>
 

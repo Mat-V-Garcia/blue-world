@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { buildWorld, terrainHeight, footprint } from './world.js';
+import { terrainHeight, footprint } from './world.js';
+import { LEVELS, currentLevelId, unlockedLevel, unlockLevel } from './levels/index.js';
+import { loadPigeonModel, createSimplePigeon } from './pigeonModel.js';
 import { createLizard } from './lizard.js';
 import { createLizardModel } from './lizardModel.js';
 import { createTarantulas, createSimpleSpider } from './enemies.js';
@@ -123,8 +125,13 @@ const camTarget = new THREE.Vector3();
 const camRay = new THREE.Raycaster();
 const camDir = new THREE.Vector3();
 
+const LEVEL_ID = currentLevelId();
+const LEVEL = LEVELS[LEVEL_ID - 1];
+
 async function init() {
-  world = await buildWorld(scene);
+  setupTitle();
+  const levelModule = await LEVEL.load();
+  world = await levelModule.build(scene);
   if (world.horizonColor) scene.fog.color.copy(world.horizonColor);
   try {
     lizard = await createLizardModel();
@@ -134,16 +141,20 @@ async function init() {
   }
   scene.add(lizard.root);
   dust = createDust(scene);
-  let makeSpider = createSimpleSpider;
+  // Each level picks its enemy: tarantulas in the desert, pigeons at the shops.
+  const foe = world.enemies || { kind: 'tarantula' };
+  const [loadModel, simple] = foe.kind === 'pigeon' ? [loadPigeonModel, createSimplePigeon] : [loadSpiderModel, createSimpleSpider];
+  let makeEnemy = simple;
   try {
-    makeSpider = await loadSpiderModel();
+    makeEnemy = await loadModel();
   } catch (err) {
-    console.warn('Tarantula model failed to load, using the simple one', err);
+    console.warn(`${foe.kind} model failed to load, using the simple one`, err);
   }
-  tarantulas = createTarantulas(scene, world.colliders, world.pebbleSpots, makeSpider);
+  tarantulas = createTarantulas(scene, world.colliders, world.pebbleSpots, makeEnemy, foe);
   reset();
   state = 'title';
   renderer.setAnimationLoop(loop);
+  if (new URLSearchParams(location.search).has('go')) start();
 }
 
 function reset() {
@@ -151,6 +162,11 @@ function reset() {
   pebbles = createPebbles(scene, world.pebbleSpots);
   player = new Player(world.colliders);
   player.yaw = Math.PI * 0.25;
+  if (world.spawn) { // each level can choose where the lizard starts
+    player.pos.set(world.spawn.x, terrainHeight(world.spawn.x, world.spawn.z), world.spawn.z);
+    player.spawn.copy(player.pos);
+    player.yaw = world.spawn.yaw ?? player.yaw;
+  }
   camYaw = player.yaw + Math.PI;
   moveBasisYaw = camYaw;
   lastKeyCombo = '';
@@ -209,6 +225,32 @@ function start() {
 }
 $('play').onclick = start;
 $('again').onclick = () => { reset(); start(); };
+$('next').onclick = () => goToLevel(LEVEL_ID + 1, true);
+
+// Switching level reloads the page with ?level=N (keeps memory clean); &go starts it.
+function goToLevel(id, autostart) {
+  const q = new URLSearchParams({ level: String(id) });
+  if (autostart) q.set('go', '1');
+  location.search = q.toString();
+}
+
+// Title screen: this level's name, story and picture, plus a picker for unlocked levels.
+function setupTitle() {
+  document.title = LEVEL_ID === 1 ? 'Blue World' : `Blue World · ${LEVEL.name}`;
+  $('level-name').textContent = `Level ${LEVEL_ID} · ${LEVEL.name}`;
+  $('level-intro').textContent = LEVEL.intro;
+  document.querySelector('#title .art').style.backgroundImage = `url('${LEVEL.title}')`;
+  const open = unlockedLevel();
+  $('levels').innerHTML = LEVELS.map((l) => {
+    const locked = l.id > open, here = l.id === LEVEL_ID;
+    return `<button class="lvl${here ? ' here' : ''}" data-id="${l.id}" ${locked ? 'disabled' : ''}>`
+      + `${locked ? '🔒' : l.id} <span>${l.name}</span></button>`;
+  }).join('');
+  $('levels').querySelectorAll('button:not([disabled])').forEach((b) => {
+    b.onclick = () => { if (Number(b.dataset.id) !== LEVEL_ID) goToLevel(Number(b.dataset.id), false); };
+  });
+  $('levels').classList.toggle('hidden', LEVELS.length < 2);
+}
 
 let toastTimer;
 function toast(msg) {
@@ -336,6 +378,10 @@ function loop() {
       setTimeout(() => {
         document.exitPointerLock?.();
         $('wintime').textContent = fmt(elapsed);
+        const hasNext = LEVEL_ID < LEVELS.length;
+        if (hasNext) unlockLevel(LEVEL_ID + 1);
+        $('next').classList.toggle('hidden', !hasNext);
+        $('win-msg').textContent = hasNext ? `Level ${LEVEL_ID + 1} · ${LEVELS[LEVEL_ID].name} is unlocked!` : 'You finished every level. Do a victory push-up!';
         $('win').classList.remove('hidden');
       }, 1200);
     }
