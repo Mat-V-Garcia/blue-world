@@ -124,7 +124,7 @@ export async function build(scene) {
   const clockMat = new THREE.MeshBasicMaterial({ map: clockTexture() });
   const lantern = add(new THREE.Mesh(new THREE.BoxGeometry(4, 4, 4), [clockMat, clockMat, roofMat, roofMat, clockMat, clockMat]));
   lantern.position.set(TX, 26, TZ);
-  boxCol(TX, TZ, 2, 2, 24, 28, true);
+  boxCol(TX, TZ, 2, 2, 24, 28, false); // clock faces: the ledge below is as high as you go
   const spire = add(new THREE.Mesh(new THREE.ConeGeometry(3.3, 4, 4), toon(0xb5532f)));
   spire.position.set(TX, 30, TZ); spire.rotation.y = Math.PI / 4;
   circCol(TX, TZ, 2.3, 28, 32, false);
@@ -183,10 +183,10 @@ export async function build(scene) {
   circCol(OX, OZ, 2.6, -100, ob + 1.3, true);
   const ot = add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 3.0, 8), toon(0x6e5138)));
   ot.position.set(OX, ob + 2.6, OZ);
-  circCol(OX, OZ, 0.5, -100, ob + 4.0, true);
+  circCol(OX, OZ, 0.5, -100, ob + 7.8, true); // climb the trunk right up through the leaves
   const canopy = add(new THREE.Mesh(new THREE.SphereGeometry(3.2, 16, 12), toon(0x3f7d34)));
   canopy.scale.set(1, 0.75, 1); canopy.position.set(OX, ob + 5.6, OZ);
-  circCol(OX, OZ, 3.1, ob + 4.0, ob + 7.8, true);
+  circCol(OX, OZ, 2.4, ob + 7.7, ob + 7.8, true); // ...and step out onto the top of the canopy
   const orangeMat = toon(0xf28a1e);
   for (let i = 0; i < 26; i++) {
     const a = rand() * Math.PI * 2, e = rand() * 1.2 - 0.3;
@@ -203,11 +203,11 @@ export async function build(scene) {
     boxCol(x, z, 1.1, 1.1, b + 2.15, b + 2.55, true); // walk underneath, climb on top
     const leg = add(new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.3, 2.3, 8), toon(0x55504a)), false);
     leg.position.set(x, b + 1.15, z);
-    circCol(x, z, 0.3, -100, b + 2.15, true); // shimmy up the leg to reach the tabletop
     const pole = add(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 3.8, 8), toon(0xdedad2)));
     pole.position.set(x, b + 4.45, z);
-    // the pole runs right up through the middle of the umbrella; step out onto the top
-    circCol(x, z, 0.2, b + 2.55, b + 7.2, true);
+    // leg + pole are one column from the ground right up through the umbrella: climb it
+    // and step out onto the top (or hop off onto the tabletop on the way)
+    circCol(x, z, 0.3, -100, b + 7.2, true);
     const shade = add(new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.0, 12, 1, true), toon(color, { side: THREE.DoubleSide })));
     shade.position.set(x, b + 6.8, z);
     circCol(x, z, 3.0, b + 7.1, b + 7.2, true); // thin walkable top surface only
