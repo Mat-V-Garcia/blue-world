@@ -353,7 +353,7 @@ export async function build(scene) {
     spawn: { x: 2, z: -2, yaw: Math.PI * 0.85 }, // looking into the plaza
     enemies: {
       kind: 'pigeon',
-      homes: [[-26, 22], [-8, 12], [0, -10], [22, -26], [-26, -12], [32, 6], [-50, 24], [44, -30]],
+      homes: [[-26, 22], [-8, 12], [14, -28], [22, -26], [-26, -12], [32, 6], [-50, 24], [44, -30]],
       count: 6, chaseSpeed: 3.4, wanderSpeed: 1.2, notice: 8, radius: 0.6, height: 1.25,
     },
     update(dt, t) {
