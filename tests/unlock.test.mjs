@@ -36,3 +36,8 @@ test('never lowers progress', () => {
 test('storage that throws is survived', () => {
   assert.doesNotThrow(() => migrateUnlocks({ getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } }));
 });
+
+test('a browser that blocks storage entirely (reading localStorage throws) is survived', () => {
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('SecurityError'); } });
+  try { assert.doesNotThrow(() => migrateUnlocks()); } finally { delete globalThis.localStorage; }
+});

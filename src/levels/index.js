@@ -46,8 +46,9 @@ export function unlockLevel(id) {
 // "Level 2 finished" (there was nothing to unlock). So, once per browser, anyone who has
 // Level 2 open gets Level 3 too instead of having to replay Level 2.
 const L3_FLAG = 'blueworld.l3open';
-export function migrateUnlocks(storage = localStorage) {
+export function migrateUnlocks(store) {
   try {
+    const storage = store ?? localStorage; // inside the try: some browsers throw just reading it
     if (storage.getItem(L3_FLAG)) return;
     if (Number(storage.getItem(KEY)) === 2) storage.setItem(KEY, '3');
     storage.setItem(L3_FLAG, '1');

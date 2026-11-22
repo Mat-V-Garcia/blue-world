@@ -345,8 +345,7 @@ function frame(dt) {
 
   // ---- Tail drop (Q): leave the tail behind wriggling; enemies nearby go for it
   // (it comes off where the tail was: a little behind the body)
-  const tailAt = new THREE.Vector3(player.pos.x - Math.sin(player.yaw) * 0.6, player.pos.y, player.pos.z - Math.cos(player.yaw) * 0.6);
-  if (playing && tailPressed && tail.drop(player.climbing ? player.pos : tailAt, player.yaw)) {
+  if (playing && tailPressed && tail.drop(player.climbing ? player.pos : player.behind(0.6), player.yaw)) {
     tarantulas.distract(tail.pos);
     sfx.tail(); toast('Dropped your tail!');
   }

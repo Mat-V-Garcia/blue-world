@@ -278,8 +278,6 @@ export async function build(scene) {
   }
   box(6.6, 0.4, 6.2, toon(0x63b57a), PX, PROOF - 0.4, PZ + 0.2);
   boxCol(PX, PZ + 0.2, 3.3, 3.1, PROOF - 0.4, PROOF, false);
-  const ridge = add(new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 6.2, 3), toon(0x63b57a)), false);
-  ridge.rotation.x = Math.PI / 2; ridge.scale.set(2.2, 1, 0.6); ridge.position.set(PX, PROOF + 0.42, PZ + 0.2);
   // ladder up the open side
   for (const s of [-1, 1]) box(0.2, DECK, 0.3, white, PX + s * 0.9, 0, PZ - 3.2);
   for (let y = 0.7; y < DECK; y += 0.8) box(1.8, 0.16, 0.24, white, PX, y, PZ - 3.2, false);
@@ -349,6 +347,11 @@ export async function build(scene) {
   const hub = add(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.3, 12), white), false);
   hub.rotation.z = Math.PI / 2; hub.position.set(KX, KR + 0.2, KZ);
   boxCol(KX, KZ, 0.25, 1.3, -100, KTOP, true);
+  // the rim curves down either side of the top: lower steps cover the rest of the wheel
+  for (const s of [-1, 1]) {
+    boxCol(KX, KZ + s * 1.65, 0.25, 0.35, -100, KTOP - 0.75, true);
+    boxCol(KX, KZ + s * 2.3, 0.25, 0.3, -100, KTOP - 1.7, true);
+  }
   const sun = add(new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.08, 16), toon(0x6d7b85)), false);
   sun.rotation.z = Math.PI / 2; sun.position.set(22.96, 4.2, -9);
 
@@ -456,6 +459,7 @@ export async function build(scene) {
     enemies: {
       kind: 'kitten', defeatable: false, scareable: true,
       homes: [[-2.5, -10], [-15, -18], [-11, 24], [6, -12], [7, 14], [-2.5, 31], [19.5, -8], [-18, 34]],
+      edgeMargin: 0.7, // walls all round: kittens must be able to reach the edges
       count: 5, chaseSpeed: 6, wanderSpeed: 1.6, notice: 9, radius: 0.7, height: 1.1,
     },
     update() {},

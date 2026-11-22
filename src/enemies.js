@@ -71,7 +71,8 @@ export function createSimpleSpider() {
 // ---------- Tarantula manager ----------
 // makeSpider(): returns { root, update(dt, speed) } — either the 3D model or the stand-in.
 // cfg (from the level): { kind, homes?: [[x,z]...], count?, chaseSpeed?, wanderSpeed?, notice?,
-//   defeatable? (default true: stomp/bite defeats it), scareable? (default false: scare() works) }
+//   defeatable? (default true: stomp/bite defeats it), scareable? (default false: scare() works),
+//   edgeMargin? (default 2) }
 // Two calm states never hurt the lizard: 'scared' (bolting home) and 'tail' (busy with a
 // dropped tail). Each runs on a timer (s.hold) and then goes back to wandering.
 export function createTarantulas(scene, colliders, pebbleSpots, makeSpider, cfg = {}) {
@@ -79,6 +80,9 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider, cfg 
   const NOTICE = cfg.notice ?? NOTICE_RANGE;
   // body size for touching / stomping (pigeons are bigger than tarantulas)
   const R = cfg.radius ?? SPIDER_RADIUS, H = cfg.height ?? SPIDER_HEIGHT;
+  // how far enemies keep from the edge of the level (levels with walls set this small,
+  // or the strip along the wall is a place they can never reach)
+  const EDGE = cfg.edgeMargin ?? 2;
   const DEFEATABLE = cfg.defeatable ?? true, SCAREABLE = cfg.scareable ?? false;
   const calm = (s) => s.state === 'scared' || s.state === 'tail';
   const clearOf = (x, z) => colliders.every((c) => footprint(c, x, z).dist > 1.2)
@@ -133,7 +137,7 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider, cfg 
         nx += -f.nz * step * 0.6; nz += f.nx * step * 0.6;
       }
     }
-    [nx, nz] = clampToWorld(nx, nz, 2);
+    [nx, nz] = clampToWorld(nx, nz, EDGE);
     s.speed = Math.hypot(nx - s.pos.x, nz - s.pos.z) / Math.max(dt, 1e-4);
     const want = Math.atan2(nx - s.pos.x, nz - s.pos.z);
     let dy = want - s.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));

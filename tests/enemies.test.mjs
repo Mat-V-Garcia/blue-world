@@ -102,3 +102,9 @@ test('reset clears scared and distracted states', () => {
   m.reset();
   assert.equal(m.spiders[0].state, 'wander');
 });
+
+test('a kitten can reach a lizard hugging the edge of a rectangular yard', () => {
+  const m = make({ ...KITTEN, edgeMargin: 0.7, bounds: { x0: -10, x1: 10, z0: -10, z1: 10 } });
+  const r = run(m, lizard(-9.7, 0), 6);
+  assert.equal(r.result, 'hurt');
+});

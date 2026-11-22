@@ -46,6 +46,15 @@ export class Player {
     return g;
   }
 
+  // The spot `dist` behind the lizard (where its tail is), or the lizard's own position
+  // if that spot is inside something solid or outside the level.
+  behind(dist) {
+    const x = this.pos.x - Math.sin(this.yaw) * dist, z = this.pos.z - Math.cos(this.yaw) * dist;
+    const [cx, cz] = clampToWorld(x, z);
+    if (cx !== x || cz !== z || this.blocking(x, z, 0.1)) return this.pos.clone();
+    return new THREE.Vector3(x, this.pos.y, z);
+  }
+
   // Is a circle of radius `rad` at (x, z) inside anything solid at the lizard's height?
   // Rocks can be wider at the feet or overhead, so test at both foot and head height.
   blocking(x, z, rad = RADIUS) {
