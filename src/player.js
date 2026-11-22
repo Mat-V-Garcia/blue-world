@@ -22,6 +22,7 @@ export class Player {
     this.landed = false;
     this.knock = new THREE.Vector2(); // knockback velocity (from getting hurt), fades out
     this.spawn = this.pos.clone();
+    this.webbed = 0;             // seconds left stuck in spider web (crawl only: no sprint, jump or climb)
   }
 
   // Got bitten: hop up and get shoved away from the attacker.
@@ -35,7 +36,7 @@ export class Player {
 
   respawn() {
     this.pos.copy(this.spawn);
-    this.velY = 0; this.wall = null; this.knock.set(0, 0); this.onGround = true;
+    this.velY = 0; this.wall = null; this.knock.set(0, 0); this.onGround = true; this.webbed = 0;
   }
 
   groundAt(x, z) {
@@ -79,7 +80,10 @@ export class Player {
     this.landed = false;
     const wish = new THREE.Vector2(input.x, input.z);
     const has = wish.lengthSq() > 0.01;
-    const speed = input.sprint ? SPRINT : WALK;
+    const webbed = this.webbed > 0;
+    this.webbed = Math.max(0, this.webbed - dt);
+    if (webbed) { this.wall = null; input = { ...input, jump: false }; }
+    const speed = webbed ? WALK / 3 : input.sprint ? SPRINT : WALK;
 
     // ---- Climbing / clinging ----
     if (this.wall) {
@@ -132,7 +136,7 @@ export class Player {
     const dx = move.x / len, dz = move.y / len;
     const hit = has ? this.blockedAt(nx, nz, dx, dz) : this.blocking(nx, nz);
     if (hit) {
-      if (hit.c.climbable && has) {
+      if (hit.c.climbable && has && !webbed) {
         // start climbing
         this.wall = hit.c;
         this.velY = 0;
