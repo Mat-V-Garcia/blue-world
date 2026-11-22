@@ -58,7 +58,8 @@ export async function build(scene) {
   const add = (m, solid = true) => { m.traverse?.((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); scene.add(m); if (solid) solids.push(m); return m; };
   // Box collider helper (axis-aligned unless angle given)
   const boxCol = (x, z, hx, hz, bottom, top, climbable, angle = 0) => colliders.push({ type: 'box', x, z, hx, hz, angle, bottom, top, climbable });
-  const circCol = (x, z, r, bottom, top, climbable) => colliders.push({ type: 'circle', x, z, r, bottom, top, climbable });
+  // rAt (optional): radius by height, for things that bulge (fountain bowls, lamp globes)
+  const circCol = (x, z, r, bottom, top, climbable, rAt) => colliders.push({ type: 'circle', x, z, r, bottom, top, climbable, ...(rAt && { rAt }) });
 
   // ---------- Ground: asphalt lot + raised sidewalks with curbs ----------
   const lot = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), toon(asphaltTex ? 0xffffff : 0x7b7d82, { map: tiled(asphaltTex, 30, 30) }));
@@ -88,22 +89,25 @@ export async function build(scene) {
   const roofMat = toon(0xc7b9a3);
   const shopFront = (tex, fallback) => (tex ? new THREE.MeshBasicMaterial({ map: tex }) : toon(fallback));
   // BoxGeometry face order: +x, -x, +y, -y, +z, -z
-  const shop = (cx, cz, w, d, front, tex) => {
+  const shop = (cx, cz, w, d, front, tex, trimCut = 0) => {
     const H = 14;
     const mats = [stucco(d / 6, H / 6), stucco(d / 6, H / 6), roofMat, roofMat, stucco(w / 6, H / 6), stucco(w / 6, H / 6)];
     mats[front] = shopFront(tex, 0xf4c9a0);
     const m = add(new THREE.Mesh(new THREE.BoxGeometry(w, H, d), mats));
     m.position.set(cx, H / 2, cz);
     boxCol(cx, cz, w / 2, d / 2, -100, H, false); // glass + stucco: too smooth to climb
-    // tiled roof trim along the front edge
-    const trim = new THREE.Mesh(new THREE.BoxGeometry(front === 5 ? w + 0.6 : 1.2, 0.9, front === 5 ? 1.2 : d + 0.6), toon(0xb5532f));
-    trim.position.set(front === 0 ? cx + w / 2 : cx, H + 0.2, front === 5 ? cz - d / 2 : cz);
+    // tiled roof trim: a fascia hung along the front edge, its top flush with the roof so
+    // the lizard walks over it instead of wading through it. trimCut stops it short at
+    // the +x end (leaves room to climb the drainpipe).
+    const tw = w + 0.6 - trimCut;
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(front === 5 ? tw : 1.2, 0.9, front === 5 ? 1.2 : d + 0.6), toon(0xb5532f));
+    trim.position.set(front === 0 ? cx + w / 2 : cx - trimCut / 2, H - 0.46, front === 5 ? cz - d / 2 : cz);
     add(trim, false);
     return H;
   };
   // North row, facing the plaza (front = -z)
   const SH = shop(-34.5, 53, 25, 14, 5, shops1);
-  shop(-9.5, 53, 25, 14, 5, shops2);
+  shop(-9.5, 53, 25, 14, 5, shops2, 2.0); // trim ends before the drainpipe at x 2.4
   // West row, facing east (front = +x)
   shop(-69, 21.5, 14, 25, 0, shops2);
   shop(-69, -3.5, 14, 25, 0, shops1);
@@ -139,13 +143,25 @@ export async function build(scene) {
   circCol(FX, FZ, 4.7, -100, CURB + 1.0, true);
   const column = add(new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.75, 4.2, 16), toon(0xe6d8c0)));
   column.position.set(FX, CURB + 3.1, FZ);
-  circCol(FX, FZ, 0.75, -100, CURB + 5.2, true);
-  for (const [r, y] of [[1.4, 2.6], [0.9, 4.2]]) { // little decorative bowls (inside the column's reach)
+  // the column's collider bulges round the two bowls and the cap, so the lizard climbs
+  // over them (not through them) and stands on top of the cap
+  const BOWLS = [[1.4, 2.6], [0.9, 4.2]];
+  const FTOP = CURB + 5.5;
+  circCol(FX, FZ, 0.9, -100, FTOP, true, (y) => {
+    if (y > FTOP - 0.3) return 0.9; // cap
+    let r = 0.75;
+    for (const [br, by] of BOWLS) {
+      const f = (y - (CURB + by - 0.2)) / 0.4; // 0 at the bowl's narrow foot, 1 at its rim
+      if (f >= -0.5 && f <= 1) r = Math.max(r, br * (0.4 + 0.6 * Math.max(0, f)));
+    }
+    return r;
+  });
+  for (const [r, y] of BOWLS) { // little decorative bowls (inside the column's reach)
     const bowl = add(new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.4, 0.4, 20), toon(0xe6d8c0)), false);
     bowl.position.set(FX, CURB + y, FZ);
   }
   const cap = add(new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.7, 0.3, 16), toon(0xd8c7a8)));
-  cap.position.set(FX, CURB + 5.35, FZ);
+  cap.position.set(FX, FTOP - 0.15, FZ);
   // water jets
   const jets = [];
   for (let i = 0; i < 6; i++) {
@@ -161,7 +177,12 @@ export async function build(scene) {
     boxCol(x, z, 1.6, 1.6, -100, base + 1.3, true);
     const trunk = add(new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, h, 10), toon(0x8a6b4a)));
     trunk.position.set(x, base + h / 2, z);
-    circCol(x, z, 0.6, -100, base + h, true);
+    // the fronds all sprout from the trunk top, so cap it with a knob the lizard stands on
+    // (it used to stand at the trunk top, buried in the frond bases)
+    const KNOB = 0.95;
+    circCol(x, z, 0.6, -100, base + h + KNOB, true);
+    const knob = add(new THREE.Mesh(new THREE.SphereGeometry(1.0, 12, 8), toon(0x6f7f3a)));
+    knob.scale.y = KNOB; knob.position.set(x, base + h, z);
     const crown = new THREE.Group(); crown.position.set(x, base + h, z);
     for (let i = 0; i < 8; i++) {
       const f = new THREE.Mesh(new THREE.ConeGeometry(0.9, 6, 4), toon(0x4f8f3a));
@@ -170,7 +191,7 @@ export async function build(scene) {
       crown.add(f);
     }
     add(crown, false);
-    return base + h;
+    return base + h + 0.95;
   };
   const palmTop = palm(-40, 30, 18);
   palm(-4, 30, 16); palm(8, 6, 17); palm(-54, -20, 15); palm(-54, 6, 18);
@@ -183,10 +204,13 @@ export async function build(scene) {
   circCol(OX, OZ, 2.6, -100, ob + 1.3, true);
   const ot = add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 3.0, 8), toon(0x6e5138)));
   ot.position.set(OX, ob + 2.6, OZ);
-  circCol(OX, OZ, 0.5, -100, ob + 7.8, true); // climb the trunk right up through the leaves
+  const OTOP = ob + 8.0; // top of the leaves
+  circCol(OX, OZ, 0.5, -100, OTOP, true); // climb the trunk right up through the leaves
   const canopy = add(new THREE.Mesh(new THREE.SphereGeometry(3.2, 16, 12), toon(0x3f7d34)));
   canopy.scale.set(1, 0.75, 1); canopy.position.set(OX, ob + 5.6, OZ);
-  circCol(OX, OZ, 2.4, ob + 7.7, ob + 7.8, true); // ...and step out onto the top of the canopy
+  // ...and step out onto the top of the canopy: three shallow steps that follow the dome
+  // (one flat disc left the lizard sunk into the leaves in the middle)
+  for (const [r, drop] of [[1.0, 0], [1.9, 0.2], [2.5, 0.5]]) circCol(OX, OZ, r, OTOP - drop - 0.1, OTOP - drop, true);
   const orangeMat = toon(0xf28a1e);
   for (let i = 0; i < 26; i++) {
     const a = rand() * Math.PI * 2, e = rand() * 1.2 - 0.3;
@@ -210,7 +234,8 @@ export async function build(scene) {
     circCol(x, z, 0.3, -100, b + 7.2, true);
     const shade = add(new THREE.Mesh(new THREE.ConeGeometry(3.2, 1.0, 12, 1, true), toon(color, { side: THREE.DoubleSide })));
     shade.position.set(x, b + 6.8, z);
-    circCol(x, z, 3.0, b + 7.1, b + 7.2, true); // thin walkable top surface only
+    // thin walkable top surface only, stepped down to follow the slope of the shade
+    for (const [r, drop] of [[0.8, 0], [1.9, 0.25], [3.0, 0.6]]) circCol(x, z, r, b + 7.1 - drop, b + 7.2 - drop, true);
     for (const s of [-1, 1]) { // chairs (solid, not climbable — skinny metal)
       const ch = add(new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.6, 1.1), toon(0x55504a)));
       ch.position.set(x + s * 2.4, b + 0.8, z);
@@ -233,6 +258,7 @@ export async function build(scene) {
     const cs = Math.cos(rot), sn = Math.sin(rot);
     boxCol(x, z, 2.5, 0.8, b + 1.15, b + 1.5, true, rot);
     boxCol(x - 0.75 * sn, z - 0.75 * cs, 2.5, 0.15, b + 1.5, b + 2.9, true, rot); // backrest (local z = -0.75)
+    for (const s of [-1, 1]) boxCol(x + s * 2.2 * cs, z - s * 2.2 * sn, 0.125, 0.7, -100, b + 1.2, false, rot); // legs: go round
     return b + 1.5;
   };
   const benchTop = bench(-30, 26, 0);
@@ -243,8 +269,9 @@ export async function build(scene) {
     const b = groundHeight(x, z);
     const post = add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 10, 8), toon(0x3e4a52)));
     post.position.set(x, b + 5, z);
-    circCol(x, z, 0.3, -100, b + 10, true);
-    const lamp = add(new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 8), toon(0xfff3c4)), false);
+    // the collider widens round the globe so the lizard climbs over it and sits on top
+    circCol(x, z, 0.6, -100, b + 10.9, true, (y) => (y > b + 9.7 ? 0.6 : 0.3));
+    const lamp = add(new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 8), toon(0xfff3c4)));
     lamp.position.set(x, b + 10.3, z);
   }
 
@@ -280,11 +307,12 @@ export async function build(scene) {
     const g = new THREE.Group(); g.position.set(x, b, z); g.rotation.y = rot;
     const basket = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.8, 3.2), wire); basket.position.y = 2.1;
     const handle = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.25, 0.25), toon(0xd64a3b)); handle.position.set(0, 3.3, -1.75);
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.15, 3.0), toon(0xc9ced6)); frame.position.y = 0.5;
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.15, 3.0), toon(0xc9ced6)); frame.position.y = 0.6;
     g.add(basket, handle, frame);
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) { const w = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), toon(0x333333)); w.position.set(sx * 0.8, 0.22, sz * 1.3); g.add(w); }
     add(g);
     boxCol(x, z, 1.1, 1.6, b + 1.2, b + 3.0, true, rot);
+    boxCol(x, z, 0.9, 1.5, b + 0.5, b + 0.68, false, rot); // bottom frame: scurry under it, not through it
     // corner posts from the wheels up to the basket: a way to climb in
     const cs = Math.cos(rot), sn = Math.sin(rot);
     for (const [lx, lz] of [[-0.9, -1.4], [0.9, -1.4], [-0.9, 1.4], [0.9, 1.4]]) {
@@ -333,13 +361,13 @@ export async function build(scene) {
   const car0 = cars[2], car1 = cars[8];
   const pebbleSpots = [
     { x: -30, z: 26, y: groundHeight(-30, 26) + 0.55, hint: 'Under the bench!' },
-    { x: FX, z: FZ, y: CURB + 5.5 + 0.6, hint: 'Top of the fountain' },
+    { x: FX, z: FZ, y: FTOP + 0.6, hint: 'Top of the fountain' },
     { x: -27, z: 31, y: cartTops[2] + 0.6, hint: 'In a shopping cart' },
     { x: car0.x, z: car0.z - 0.6, y: 5.0 + 0.6, hint: 'Car roof!' },
     { x: car1.x, z: car1.z, y: 0.5, hint: 'Hiding under a car' },
     { x: -12, z: 38, y: umbrellaTop + 0.6, hint: 'On the café umbrella' },
     { x: TX + 2.5, z: TZ, y: 24 + 0.6, hint: 'Clock tower ledge!' },
-    { x: OX, z: OZ, y: ob + 7.8 + 0.6, hint: 'Up the orange tree' },
+    { x: OX, z: OZ, y: OTOP + 0.6, hint: 'Up the orange tree' },
     { x: -40, z: 30, y: palmTop + 0.6, hint: 'Top of a palm tree!' },
     { x: -20, z: 50, y: SH + 0.6, hint: 'On the shop roof' },
   ];

@@ -116,7 +116,7 @@ document.addEventListener('pointerlockchange', () => {
 // ---------- Game objects ----------
 let state = 'loading';
 let world, player, lizard, pebbles, dust, tarantulas;
-let collected = 0, elapsed = 0;
+let collected = 0;
 // Health: 3 hearts. A touch costs one; they refill slowly if you stay out of trouble.
 const MAX_HEARTS = 3, INVULN_TIME = 1.6, REGEN_DELAY = 8, REGEN_EVERY = 10;
 let hearts = MAX_HEARTS, invuln = 0, sinceHit = 99, regenT = 0;
@@ -171,7 +171,6 @@ function reset() {
   moveBasisYaw = camYaw;
   lastKeyCombo = '';
   collected = 0;
-  elapsed = 0;
   $('count').textContent = '0';
   camTarget.copy(player.pos);
   hearts = MAX_HEARTS; invuln = 0; sinceHit = 99;
@@ -260,7 +259,6 @@ function toast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
 }
-const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 // ---------- Loop ----------
 const clock = new THREE.Clock();
@@ -377,7 +375,6 @@ function loop() {
       sfx.win();
       setTimeout(() => {
         document.exitPointerLock?.();
-        $('wintime').textContent = fmt(elapsed);
         const hasNext = LEVEL_ID < LEVELS.length;
         if (hasNext) unlockLevel(LEVEL_ID + 1);
         $('next').classList.toggle('hidden', !hasNext);
@@ -386,7 +383,6 @@ function loop() {
       }, 1200);
     }
   }
-  if (playing) { elapsed += dt; $('timer').textContent = fmt(elapsed); }
 
   // camera
   if (state === 'title') camYaw += dt * 0.15; // slow orbit behind the title card

@@ -19,7 +19,6 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #8fbbe6; f
 @keyframes shake { 0%,100% { transform: none } 25% { transform: translateX(-6px) } 75% { transform: translateX(6px) } }
 #flash { position: fixed; inset: 0; background: #fff6e8; opacity: 0; pointer-events: none; transition: opacity .4s; }
 #flash.show { opacity: 1; }
-.timer { position: absolute; top: 26px; right: 24px; font-size: 24px; font-weight: 600; background: #fff6e8cc; border-radius: 999px; padding: 4px 16px; }
 .hint { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); font-size: 15px; background: #fff6e8bb; border-radius: 999px; padding: 6px 16px; white-space: nowrap; transition: opacity 1s; }
 .toast { position: absolute; top: 90px; left: 50%; transform: translateX(-50%); font-size: 26px; font-weight: 700; color: #fff; text-shadow: 0 3px 0 #b8673c, 0 0 12px #e8955a; opacity: 0; transition: opacity .3s; }
 .toast.show { opacity: 1; }
@@ -81,7 +80,6 @@ html, body { overscroll-behavior: none; -webkit-user-select: none; user-select: 
 body.touch-mode .hint, body.touch-mode #paused { display: none !important; }
 body.touch-mode .counter { top: calc(14px + env(safe-area-inset-top)); left: calc(14px + env(safe-area-inset-left)); }
 body.touch-mode .hearts { left: calc(18px + env(safe-area-inset-left)); }
-body.touch-mode .timer { top: calc(18px + env(safe-area-inset-top)); }
 .touch-only { display: none; }
 body.touch-mode .touch-only { display: block; }
 body.touch-mode .mouse-only { display: none; }

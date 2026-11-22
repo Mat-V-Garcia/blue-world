@@ -115,9 +115,10 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider, cfg 
     if (d < 0.05) { s.speed = 0; return d; }
     const step = Math.min(d, speed * dt);
     let nx = s.pos.x + (dx / d) * step, nz = s.pos.z + (dz / d) * step;
-    // walk around rocks, cacti, bushes etc. (spiders don't climb)
+    // walk around rocks, cacti, bushes etc. (spiders don't climb). Things overhead are
+    // only ignored if the enemy really fits underneath (pigeons are too tall for cars).
     for (const c of colliders) {
-      if (c.bottom > -50) continue;
+      if (c.bottom >= s.pos.y + H || c.top <= s.pos.y + 0.1) continue;
       const f = footprint(c, nx, nz, s.pos.y + 0.1);
       if (f.dist < R) {
         nx += f.nx * (R - f.dist);
