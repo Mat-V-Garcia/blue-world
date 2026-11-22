@@ -104,7 +104,8 @@ test('reset clears scared and distracted states', () => {
 });
 
 test('a kitten can reach a lizard hugging the edge of a rectangular yard', () => {
-  const m = make({ ...KITTEN, edgeMargin: 0.7, bounds: { x0: -10, x1: 10, z0: -10, z1: 10 } });
+  // home within notice range of the lizard, so the chase doesn't depend on random wandering
+  const m = make({ ...KITTEN, edgeMargin: 0.7, homes: [[-4, 0]], bounds: { x0: -10, x1: 10, z0: -10, z1: 10 } });
   const r = run(m, lizard(-9.7, 0), 6);
   assert.equal(r.result, 'hurt');
 });

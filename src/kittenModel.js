@@ -119,36 +119,108 @@ export function createSimpleKitten() {
   };
 }
 
-// ---------- 3D kitten model (art pass) ----------
-// Loads /assets/kitten.glb if it exists; main.js falls back to the kitten above when this
-// rejects. Until the model is rigged for it there is no bone animation here: it bobs as
-// it walks and hops when scared. The GLB is expected to face +X with Y up, like the others.
-const SCALE = 2.2;
+// ---------- Magnific 3D kitten (Tripo P1, rigged) ----------
+// One cream-white model, recoloured into five coats. The GLB faces +X with Y up, 1 unit
+// long and 0.89 tall. Its skeleton (three.js drops the "::" from the names) has front
+// legs tripo0_Right_Limb_0..1 / tripo0_Left_Limb_0..1, a tail chain
+// tripo1_Left_Limb_0..2 + bone_4..7 (Tripo mislabelled it as a limb), a neck/head chain
+// tripoHead_0..2, and NO hind-leg bones — so the walk is front paws plus a bouncy trot.
+const SCALE = 2.0;
+const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
+// fur tints (multiplied into the pale fur; eyes, nose and ears keep their own colour)
+const TINTS = [0xffffff, 0xf2a25a, 0x9aa3b0, 0x4a4650, 0xb98f66]; // cream, orange, grey, black, brown
+let nextTint = 0;
+
 export async function loadKittenModel(url = '/assets/kitten.glb') {
   const gltf = await new GLTFLoader().loadAsync(url);
   const source = gltf.scene;
   source.traverse((o) => {
     if (o.isMesh) {
       o.castShadow = true;
-      o.frustumCulled = false;
-      if (o.material) { o.material.metalness = 0; o.material.roughness = 0.8; }
+      o.frustumCulled = false; // skinned bounds don't follow the bones
     }
   });
+
   return function makeKitten() {
+    const model = cloneSkinned(source);
+    const tint = new THREE.Color(TINTS[nextTint++ % TINTS.length]);
+    model.traverse((o) => {
+      if (!o.isMesh || !o.material) return;
+      const m = o.material = o.material.clone();
+      m.metalness = 0; m.roughness = 0.85;
+      // Recolour the fur only: pale, greyish texels take the tint; colourful ones (green
+      // eyes, pink nose and ears) are left alone.
+      m.onBeforeCompile = (shader) => {
+        shader.uniforms.furTint = { value: tint };
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nuniform vec3 furTint;')
+          .replace('#include <map_fragment>', `#include <map_fragment>
+            { float mx = max(diffuseColor.r, max(diffuseColor.g, diffuseColor.b));
+              float mn = min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b));
+              float colourful = smoothstep(0.34, 0.52, (mx - mn) / max(mx, 0.001));
+              diffuseColor.rgb = mix(diffuseColor.rgb * furTint, diffuseColor.rgb, colourful); }`);
+      };
+    });
     const root = new THREE.Group();
     const turn = new THREE.Group();
     turn.rotation.y = -Math.PI / 2; // model +X -> game +Z
     turn.scale.setScalar(SCALE);
-    turn.add(cloneSkinned(source));
     root.add(turn);
-    let phase = Math.random() * 10;
+    turn.add(model);
+    model.updateMatrixWorld(true);
+
+    const bones = {};
+    model.traverse((o) => { if (o.isBone) bones[o.name] = o; });
+    const modelInv = new THREE.Matrix4().copy(model.matrixWorld).invert();
+    const rig = new Map();
+    const prep = (b) => {
+      if (!b) return;
+      const pm = new THREE.Matrix4().multiplyMatrices(modelInv, b.parent.matrixWorld);
+      const pq = new THREE.Quaternion();
+      pm.decompose(new THREE.Vector3(), pq, new THREE.Vector3());
+      rig.set(b, { rest: b.quaternion.clone(), parentInv: pq.invert() });
+    };
+    const tq = new THREE.Quaternion(), ta = new THREE.Vector3(), acc = new THREE.Quaternion();
+    // pose(bone, [[axis, angle], ...]) — combined rotation in model space
+    const pose = (b, rots) => {
+      if (!b) return;
+      const r = rig.get(b);
+      acc.identity();
+      for (const [axis, ang] of rots) { ta.copy(axis).applyQuaternion(r.parentInv); tq.setFromAxisAngle(ta, ang); acc.premultiply(tq); }
+      b.quaternion.copy(acc).multiply(r.rest);
+    };
+    const legR = bones.tripo0_Right_Limb_0, legL = bones.tripo0_Left_Limb_0;
+    const pawR = bones.tripo0_Right_Limb_1, pawL = bones.tripo0_Left_Limb_1;
+    const tail = ['tripo1_Left_Limb_0', 'tripo1_Left_Limb_1', 'tripo1_Left_Limb_2', 'bone_4', 'bone_5', 'bone_6', 'bone_7'].map((n) => bones[n]).filter(Boolean);
+    const neck = bones.tripoHead_0, head = bones.tripoHead_1;
+    [legR, legL, pawR, pawL, neck, head, ...tail].forEach(prep);
+
+    let phase = Math.random() * 10, idle = Math.random() * 10, puff = 0, bat = 0;
     return {
       root,
       update(dt, speed, state) {
-        phase += dt * (3 + speed * 6);
+        idle += dt;
         const g = Math.min(1, speed);
-        turn.position.y = Math.abs(Math.sin(phase)) * 0.05 * g + (state === 'scared' ? 0.1 : 0);
-        turn.rotation.x = Math.sin(phase) * 0.05 * g;
+        phase += dt * (4 + speed * 5);
+        puff = THREE.MathUtils.lerp(puff, state === 'scared' ? 1 : 0, Math.min(1, dt * 10));
+        bat = THREE.MathUtils.lerp(bat, state === 'tail' && g < 0.1 ? 1 : 0, Math.min(1, dt * 8));
+        // front paws step; one of them bats at a dropped tail
+        const s = Math.sin(phase) * 0.6 * g;
+        pose(legR, [[Z, s + bat * (0.9 + Math.sin(idle * 14) * 0.45)]]);
+        pose(legL, [[Z, -s]]);
+        pose(pawR, [[Z, -Math.max(0, s) * 0.5 - bat * 0.4]]);
+        pose(pawL, [[Z, -Math.max(0, -s) * 0.5]]);
+        // no hind-leg bones: the back end follows with a bouncy trot and a little wiggle
+        turn.position.y = (Math.abs(Math.sin(phase)) * 0.09 * g + puff * 0.12) * SCALE / 2;
+        turn.rotation.x = Math.sin(phase) * 0.07 * g;          // side-to-side roll
+        turn.rotation.z = Math.cos(phase * 2) * 0.05 * g - puff * 0.12; // rocking; rears back when scared
+        // tail: lazy swish, standing straight up and fluffed when scared
+        tail.forEach((b, i) => pose(b, [[Y, Math.sin(idle * 2.4 - i * 0.6) * 0.14 * (1 - puff)], [Z, i === 0 ? puff * 0.35 : 0]]));
+        tail[0]?.scale.setScalar(1 + puff * 0.45);
+        // head: looks about when idle, bobs when trotting, dips to watch the tail
+        const look = g < 0.05 && !bat && puff < 0.1 ? Math.sin(idle * 0.6) * 0.35 : 0;
+        pose(neck, [[Y, look], [Z, -bat * 0.35 + Math.sin(phase * 2) * 0.04 * g]]);
+        pose(head, [[Z, -bat * 0.2]]);
       },
     };
   };

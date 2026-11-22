@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { toon, loadTexture } from '../materials.js';
+import { toon, loadTexture, tiled } from '../materials.js';
 import { setGround, buildSky, rng } from '../world.js';
 
 // Level 3 — The Back Yard: the family's own back yard on a tidy, sunny day.
@@ -45,7 +45,18 @@ const speckle = (base, dots, n) => (g, w, h) => {
 
 export async function build(scene) {
   setGround({ height: groundHeight, radius: 60, bounds: { x0: X0, x1: X1, z0: Z0, z1: Z1 } });
-  const skyTex = await loadTexture('sky.jpg');
+  const [yardSky, grassTex, concreteTex, clapTex] = await Promise.all([
+    loadTexture('sky-yard.jpg'), loadTexture('grass.jpg'), loadTexture('concrete.jpg'), loadTexture('clapboard.jpg'),
+  ]);
+  const skyTex = yardSky || await loadTexture('sky.jpg');
+  // painted boards (Magnific clapboard), tinted by `color`; `upright` turns them into
+  // vertical fence/shed boards. Falls back to drawn boards if the image is missing.
+  const boarded = (color, rx, ry, upright, drawn) => {
+    const map = tiled(clapTex, rx, ry);
+    if (!map) return toon(0xffffff, { map: drawn });
+    if (upright) { map.center.set(0.5, 0.5); map.rotation = Math.PI / 2; }
+    return toon(color, { map });
+  };
   const horizonColor = await buildSky(scene, skyTex);
   const rand = rng(23);
   const colliders = [], solids = [];
@@ -78,7 +89,8 @@ export async function build(scene) {
   };
   // patio: pale concrete with curved terracotta-brick bands sweeping across it
   const patioTex = canvasTex(512, 1024, (g, w, h) => {
-    speckle('#e9e4da', ['#dfd9cd', '#f1ede5'], 900)(g, w, h);
+    if (concreteTex) { for (let y = 0; y < h; y += 256) for (let x = 0; x < w; x += 256) g.drawImage(concreteTex.image, x, y, 256, 256); }
+    else speckle('#e9e4da', ['#dfd9cd', '#f1ede5'], 900)(g, w, h);
     g.strokeStyle = '#c9785a'; g.lineWidth = 26;
     for (let r = 240; r < 1400; r += 235) { g.beginPath(); g.arc(-60, h + 80, r, 0, Math.PI * 2); g.stroke(); }
     g.strokeStyle = '#b5654a'; g.lineWidth = 2; // brick joints
@@ -87,12 +99,12 @@ export async function build(scene) {
     }
   });
   flat(X0, -5, -48, PORCH_Z, toon(0xffffff, { map: patioTex }));
-  flat(-5, 0, -48, PORCH_Z, toon(0xffffff, { map: canvasTex(128, 128, speckle('#dcd8cf', ['#d2cec4', '#e6e2da'], 260), 1, 16) }));
-  flat(0, X1, -48, PORCH_Z, toon(0xffffff, { map: canvasTex(128, 128, speckle('#6fb04f', ['#63a546', '#7aba58', '#69aa4a'], 500), 8, 28) }));
+  flat(-5, 0, -48, PORCH_Z, toon(concreteTex ? 0xf2efe9 : 0xffffff, { map: tiled(concreteTex, 0.6, 11) || canvasTex(128, 128, speckle('#dcd8cf', ['#d2cec4', '#e6e2da'], 260), 1, 16) }));
+  flat(0, X1, -48, PORCH_Z, toon(0xffffff, { map: tiled(grassTex, 6, 22) || canvasTex(128, 128, speckle('#6fb04f', ['#63a546', '#7aba58', '#69aa4a'], 500), 8, 28) }));
   flat(12, 20, -34.5, -25.5, toon(0xe4dfd4), 0.02); // little paved pad under the bench
 
   // ---------- The white house (left) ----------
-  box(3, 14, 96, toon(0xffffff, { map: canvasTex(64, 64, boards('#fbfaf6', '#e3e0d8', false), 1, 14) }), -25.5, 0, 0);
+  box(3, 14, 96, boarded(0xffffff, 12, 1.75, false, canvasTex(64, 64, boards('#fbfaf6', '#e3e0d8', false), 1, 14)), -25.5, 0, 0);
   boxCol(-25.5, 0, 1.5, 48, -100, 14, false);
   box(4, 0.5, 96, toon(0x8d9299), -25, 14, 0, false); // eave
   for (const wz of [-22, 12]) { // windows: white frames, blue glass
@@ -103,7 +115,7 @@ export async function build(scene) {
 
   // ---------- The fence (right): white boards, wide enough to walk along the top ----------
   const FENCE_H = 6;
-  box(1, FENCE_H, 96, toon(0xffffff, { map: canvasTex(64, 64, boards('#fbfaf6', '#dedbd2', true), 60, 1) }), 23.5, 0, 0);
+  box(1, FENCE_H, 96, boarded(0xffffff, 12, 0.75, true, canvasTex(64, 64, boards('#fbfaf6', '#dedbd2', true), 60, 1)), 23.5, 0, 0);
   boxCol(23.5, 0, 0.5, 48, -100, FENCE_H, true);
 
   // ---------- Near end: brick edging and a clipped hedge ----------
@@ -115,7 +127,7 @@ export async function build(scene) {
   // ---------- Far end: the green house and its porch ----------
   const green = toon(0xb7e08a), orange = toon(0xe58a3c);
   box(48, PORCH_H, 8, toon(0xc79a6b), 0, 0, 44);            // porch deck (ground height does the step)
-  box(52, 12, 2, toon(0xffffff, { map: canvasTex(64, 64, boards('#b9e290', '#a3cf7a', false), 1, 12) }), 0, 0, 47);
+  box(52, 12, 2, boarded(0xb9e290, 6.5, 1.5, false, canvasTex(64, 64, boards('#b9e290', '#a3cf7a', false), 1, 12)), 0, 0, 47);
   boxCol(0, 47, 26, 1, -100, 12, false);
   box(52.4, 0.6, 2.4, orange, 0, 12, 47, false);            // trim band under the gable
   const gable = new THREE.Shape([new THREE.Vector2(-26.5, 0), new THREE.Vector2(26.5, 0), new THREE.Vector2(0, 9)]);
@@ -357,7 +369,7 @@ export async function build(scene) {
 
   // ---------- Shed, mailbox, snake plants, bench, bike (near right corner) ----------
   const SHX = 18, SHZ = -41, SHTOP = 6.9;
-  box(8, SHTOP - 0.4, 7, toon(0xffffff, { map: canvasTex(64, 64, boards('#cfe6cf', '#b9d6ba', true), 8, 1) }), SHX, 0, SHZ);
+  box(8, SHTOP - 0.4, 7, boarded(0xcfe6cf, 1, 0.8, true, canvasTex(64, 64, boards('#cfe6cf', '#b9d6ba', true), 8, 1)), SHX, 0, SHZ);
   box(8.3, 0.4, 7.3, toon(0xeef3ee), SHX, SHTOP - 0.4, SHZ);
   boxCol(SHX, SHZ, 4, 3.5, -100, SHTOP, true);
   box(0.1, 5, 2.6, white, SHX - 4.03, 0, SHZ, false);                 // door
@@ -460,7 +472,7 @@ export async function build(scene) {
       kind: 'kitten', defeatable: false, scareable: true,
       homes: [[-2.5, -10], [-15, -18], [-11, 24], [6, -12], [7, 14], [-2.5, 31], [19.5, -8], [-18, 34]],
       edgeMargin: 0.7, // walls all round: kittens must be able to reach the edges
-      count: 5, chaseSpeed: 6, wanderSpeed: 1.6, notice: 9, radius: 0.7, height: 1.1,
+      count: 5, chaseSpeed: 6, wanderSpeed: 1.6, notice: 9, radius: 0.7, height: 1.7,
     },
     update() {},
   };

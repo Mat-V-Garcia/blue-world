@@ -50,7 +50,7 @@ Manual deploy, if ever needed: `npx vercel deploy --prod --scope mathews-project
 - `src/player.js` — movement, jumping, climbing
 - `src/pebbles.js` — pebbles, sparkles, dust puffs
 - `src/enemies.js` — enemies (tarantulas, pigeons, kittens): wandering, chasing, stomp/bite, respawn, getting scared, going for a dropped tail
-- `src/kittenModel.js` — the kitten built from shapes (and a loader for a future `kitten.glb`)
+- `src/kittenModel.js` — the Magnific 3D kitten (one cream model recoloured into five coats; front-paw trot, tail, scared and batting poses) and the simple shape-built fallback
 - `src/tail.js` — the tail drop: the wriggling tail and the regrow timer
 - `src/spiderModel.js` — the Magnific 3D tarantula and its leg animation
 - `src/pigeonModel.js` — the Magnific 3D pigeon (head-bob walk, pecking, wing flaps)

@@ -26,7 +26,7 @@ export const LEVELS = [
     id: 3,
     name: 'The Back Yard',
     intro: 'You slipped under the fence into a sunny back yard. Ten golden pebbles are hidden around the patio, the swings and the lemon tree. The alley kittens only want to play, but they play rough!',
-    title: '/assets/title.jpg', // stand-in until the yard gets its own picture
+    title: '/assets/title-yard.jpg',
     hint: 'WASD move · Mouse look · Space jump · E push-ups scare kittens · Q drop tail · Shift sprint',
     help: "Kittens can't be beaten · Do push-ups (E) to scare them or drop your tail (Q) to fool them · Climb or hide where they can't reach",
     helpTouch: 'Left thumb: move (push far to run) · Right thumb: drag to look · 💪 scares kittens · Tail fools them',
