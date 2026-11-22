@@ -32,6 +32,17 @@ export const LEVELS = [
     helpTouch: 'Left thumb: move (push far to run) · Right thumb: drag to look · 💪 scares kittens · Tail fools them',
     load: () => import('./yard.js'),
   },
+  {
+    id: 4,
+    boss: true, // won by beating the boss, not by collecting pebbles
+    name: 'The Giant Tarantula',
+    intro: 'Something huge is stirring under the dunes. The giant tarantula has woken up, and only one small lizard can send it back!',
+    title: '/assets/title.jpg',
+    hint: 'Dodge its lunge · Jump on its back while its fangs are stuck · Q drop tail to trick it · Hide from webs behind rocks',
+    help: 'Dodge the lunge, then jump on its back while its fangs are stuck in the sand · Q drops your tail to trick it · Rocks block its webs',
+    helpTouch: 'Dodge the lunge, then Jump onto its back while its fangs are stuck · Tail tricks it · Rocks block its webs',
+    load: () => import('./boss.js'),
+  },
 ];
 
 // Progress (highest level unlocked) is kept in this browser only.

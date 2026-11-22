@@ -41,3 +41,21 @@ test('a browser that blocks storage entirely (reading localStorage throws) is su
   Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('SecurityError'); } });
   try { assert.doesNotThrow(() => migrateUnlocks()); } finally { delete globalThis.localStorage; }
 });
+
+// ---- the boss (level 4) ----
+const withBrowser = async (unlocked, search, fn) => {
+  globalThis.localStorage = store(unlocked ? { 'blueworld.unlocked': String(unlocked) } : {});
+  globalThis.location = { search };
+  try { return fn(await import('../src/levels/index.js')); } finally { delete globalThis.localStorage; delete globalThis.location; }
+};
+
+test('asking for the boss by address falls back to Level 3 until it is unlocked', async () => {
+  assert.equal(await withBrowser(3, '?level=4', (m) => m.currentLevelId()), 3);
+  assert.equal(await withBrowser(4, '?level=4', (m) => m.currentLevelId()), 4);
+});
+
+test('nobody gets the boss unlocked automatically', () => {
+  const s = store({ 'blueworld.unlocked': '3' });
+  migrateUnlocks(s);
+  assert.equal(s.m.get('blueworld.unlocked'), '3');
+});
