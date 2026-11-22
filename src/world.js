@@ -21,7 +21,9 @@ export function worldRadius() { return ground.radius; }
 // Where the painted horizon (mesas meet sand) sits in sky.jpg, as a fraction up from the
 // bottom. Measured for the Magnific blue-sky painting; change if the sky image changes.
 const SKY_HORIZON = 0.25;
-export async function buildSky(scene, skyTex) {
+// out (optional) is filled with { top, bottom, painting } so the boss level's storm can
+// recolour the sky: the dome's two colours and the painted panorama's material.
+export async function buildSky(scene, skyTex, out = null) {
   // Gradient dome
   // Midday blue: deep blue overhead, pale haze at the horizon (overridden by the painting).
   const topColor = new THREE.Color(0x2f6fc4), horizon = new THREE.Color(0xcfe3f2);
@@ -33,6 +35,7 @@ export async function buildSky(scene, skyTex) {
     fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying vec3 vp; void main(){ float h = clamp(normalize(vp).y * 1.6, 0.0, 1.0); gl_FragColor = vec4(mix(bottom, top, h), 1.0); }',
   });
   scene.add(new THREE.Mesh(domeGeo, domeMat));
+  if (out) Object.assign(out, { top: topColor, bottom: new THREE.Color(), painting: null });
 
   if (skyTex) {
     // Painted panorama wrapped around the horizon (twice, mirrored seam hidden by repeat).
@@ -64,7 +67,9 @@ export async function buildSky(scene, skyTex) {
     );
     cyl.position.y = H / 2 - H * SKY_HORIZON; // painting's horizon sits at eye level
     scene.add(cyl);
+    if (out) out.painting = cyl.material;
   }
+  if (out) { out.bottom.copy(horizon); domeMat.uniforms.bottom.value = out.bottom; }
   return horizon;
 }
 
