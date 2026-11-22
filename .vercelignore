@@ -3,6 +3,9 @@ art/
 dist/
 node_modules/
 docs/
+tests/
+tools/
+.superpowers/
 .claude/
 .env*
 .vercel/

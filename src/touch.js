@@ -1,7 +1,7 @@
 // On-screen controls for tablets (and phones):
 //  - left half: a floating joystick appears under your thumb (push far to run)
 //  - right half: drag to look around
-//  - buttons: Jump, Bite, Push-ups
+//  - buttons: Jump, Bite, Push-ups, Tail (drop it)
 // Uses pointer events, so several fingers work at once.
 
 const DEADZONE = 0.15;
@@ -17,7 +17,7 @@ export function createTouchControls({ onLook }) {
   const base = document.getElementById('stick-base');
   const knob = document.getElementById('stick-knob');
 
-  const state = { x: 0, y: 0, sprint: false, active: false, jump: false, bite: false, pushups: false, enabled: false };
+  const state = { x: 0, y: 0, sprint: false, active: false, jump: false, bite: false, tail: false, pushups: false, enabled: false };
   let stickId = null, lookId = null, sx = 0, sy = 0, lx = 0, ly = 0;
 
   function enable() {
@@ -81,6 +81,7 @@ export function createTouchControls({ onLook }) {
   };
   bind('btn-jump', () => { state.jump = true; });
   bind('btn-bite', () => { state.bite = true; });
+  bind('btn-tail', () => { state.tail = true; });
   bind('btn-push', () => { state.pushups = true; }, () => { state.pushups = false; });
 
   // Stop iPad Safari from zooming / scrolling the page during play
@@ -93,9 +94,10 @@ export function createTouchControls({ onLook }) {
     show(on) { layer.classList.toggle('hidden', !on); },
     consumeJump() { const j = state.jump; state.jump = false; return j; },
     consumeBite() { const b = state.bite; state.bite = false; return b; },
+    consumeTail() { const b = state.tail; state.tail = false; return b; },
     releaseAll() {
       stickId = null; lookId = null;
-      Object.assign(state, { x: 0, y: 0, sprint: false, active: false, jump: false, bite: false, pushups: false });
+      Object.assign(state, { x: 0, y: 0, sprint: false, active: false, jump: false, bite: false, tail: false, pushups: false });
       base.classList.remove('show');
       knob.style.transform = '';
     },

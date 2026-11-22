@@ -4,8 +4,16 @@ import * as THREE from 'three';
 // rock-shape helpers and collider maths. Levels live in ./levels/.
 
 // The active level sets these (see setGround); player, enemies and camera read them.
-const ground = { height: () => 0, radius: 92 };
-export function setGround({ height, radius }) { ground.height = height; ground.radius = radius; }
+const ground = { height: () => 0, radius: 92, bounds: null };
+// bounds (optional): { x0, x1, z0, z1 } for a rectangular level; otherwise a circle of `radius`.
+export function setGround({ height, radius, bounds = null }) { ground.height = height; ground.radius = radius; ground.bounds = bounds; }
+// Pull a point back inside the level, keeping `margin` away from the edge.
+export function clampToWorld(x, z, margin = 0) {
+  const b = ground.bounds;
+  if (b) return [Math.max(b.x0 + margin, Math.min(b.x1 - margin, x)), Math.max(b.z0 + margin, Math.min(b.z1 - margin, z))];
+  const r = Math.hypot(x, z), max = ground.radius - margin;
+  return r > max ? [x * max / r, z * max / r] : [x, z];
+}
 export function terrainHeight(x, z) { return ground.height(x, z); }
 export function worldRadius() { return ground.radius; }
 

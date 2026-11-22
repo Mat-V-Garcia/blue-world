@@ -153,6 +153,8 @@ export function createLizard() {
   let idleT = 0;
 
   return {
+    // k: 1 = full tail, 0 = dropped; in between while it grows back
+    setTail(k) { tailSegs[0].scale.setScalar(Math.max(0.001, k)); },
     root,
     body,
     head,

@@ -30,6 +30,8 @@ export const sfx = {
   },
   jump() { tone(300, 0, 0.15, 'sine', 0.08, 520); },
   land() { tone(120, 0, 0.08, 'triangle', 0.08, 70); },
+  scare() { tone(700, 0, 0.09, 'square', 0.06, 1400); tone(1400, 0.08, 0.16, 'triangle', 0.08, 500); },
+  tail() { tone(520, 0, 0.07, 'triangle', 0.1, 260); tone(180, 0.05, 0.12, 'sine', 0.1, 90); },
   pushup() { tone(200, 0, 0.06, 'square', 0.03, 260); },
   bite() { tone(900, 0, 0.05, 'square', 0.06, 300); tone(500, 0.04, 0.05, 'square', 0.05, 200); },
   stomp() { tone(220, 0, 0.12, 'triangle', 0.15, 80); tone(660, 0.08, 0.15, 'sine', 0.1, 990); },

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { terrainHeight, footprint, worldRadius } from './world.js';
+import { terrainHeight, footprint, clampToWorld } from './world.js';
 import { toon } from './materials.js';
 
 // ---------- Tuning ----------
@@ -70,12 +70,17 @@ export function createSimpleSpider() {
 
 // ---------- Tarantula manager ----------
 // makeSpider(): returns { root, update(dt, speed) } — either the 3D model or the stand-in.
-// cfg (from the level): { kind, homes?: [[x,z]...], count?, chaseSpeed?, wanderSpeed?, notice? }
+// cfg (from the level): { kind, homes?: [[x,z]...], count?, chaseSpeed?, wanderSpeed?, notice?,
+//   defeatable? (default true: stomp/bite defeats it), scareable? (default false: scare() works) }
+// Two calm states never hurt the lizard: 'scared' (bolting home) and 'tail' (busy with a
+// dropped tail). Each runs on a timer (s.hold) and then goes back to wandering.
 export function createTarantulas(scene, colliders, pebbleSpots, makeSpider, cfg = {}) {
   const CHASE = cfg.chaseSpeed ?? CHASE_SPEED, WANDER = cfg.wanderSpeed ?? WANDER_SPEED;
   const NOTICE = cfg.notice ?? NOTICE_RANGE;
   // body size for touching / stomping (pigeons are bigger than tarantulas)
   const R = cfg.radius ?? SPIDER_RADIUS, H = cfg.height ?? SPIDER_HEIGHT;
+  const DEFEATABLE = cfg.defeatable ?? true, SCAREABLE = cfg.scareable ?? false;
+  const calm = (s) => s.state === 'scared' || s.state === 'tail';
   const clearOf = (x, z) => colliders.every((c) => footprint(c, x, z).dist > 1.2)
     && pebbleSpots.every((p) => Math.hypot(p.x - x, p.z - z) > 4);
   const homes = (cfg.homes || HOMES).filter(([x, z]) => clearOf(x, z)).slice(0, cfg.count ?? COUNT);
@@ -87,6 +92,7 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider, cfg 
       v, home: new THREE.Vector2(hx, hz), pos: new THREE.Vector3(hx, terrainHeight(hx, hz), hz),
       yaw: Math.random() * Math.PI * 2, target: new THREE.Vector2(hx, hz), retarget: 0,
       state: 'wander', alive: true, deadT: 0, squash: 0, speed: 0, seed: i, pause: 0,
+      hold: 0, goal: new THREE.Vector2(),
     };
     return s;
   });
@@ -127,8 +133,7 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider, cfg 
         nx += -f.nz * step * 0.6; nz += f.nx * step * 0.6;
       }
     }
-    const r = Math.hypot(nx, nz);
-    if (r > worldRadius() - 2) { nx *= (worldRadius() - 2) / r; nz *= (worldRadius() - 2) / r; }
+    [nx, nz] = clampToWorld(nx, nz, 2);
     s.speed = Math.hypot(nx - s.pos.x, nz - s.pos.z) / Math.max(dt, 1e-4);
     const want = Math.atan2(nx - s.pos.x, nz - s.pos.z);
     let dy = want - s.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
@@ -162,10 +167,21 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider, cfg 
         const toP = Math.hypot(player.pos.x - s.pos.x, player.pos.z - s.pos.z);
         const fromHome = Math.hypot(player.pos.x - s.home.x, player.pos.z - s.home.y);
         const playerLow = player.pos.y - terrainHeight(player.pos.x, player.pos.z) < 1.5; // can't reach you up high
-        if (s.state !== 'chase' && toP < NOTICE && playerLow) s.state = 'chase';
-        if (s.state === 'chase' && (fromHome > GIVE_UP_RANGE || !playerLow)) s.state = 'return';
+        if (calm(s)) {
+          s.hold -= dt;
+          if (s.hold <= 0) s.state = 'wander';
+        } else {
+          if (s.state !== 'chase' && toP < NOTICE && playerLow) s.state = 'chase';
+          if (s.state === 'chase' && (fromHome > GIVE_UP_RANGE || !playerLow)) s.state = 'return';
+        }
 
-        if (s.pause > 0) {
+        if (s.state === 'scared') {
+          if (moveTo(s, s.home.x, s.home.y, CHASE * 1.6, dt) < 0.5) s.speed = 0;
+        } else if (s.state === 'tail') {
+          // go and bat at the dropped tail, stopping at touching distance
+          if (Math.hypot(s.goal.x - s.pos.x, s.goal.y - s.pos.z) > R + 0.3) moveTo(s, s.goal.x, s.goal.y, CHASE, dt);
+          else s.speed = 0;
+        } else if (s.pause > 0) {
           // just bit you: scuttle back a little, then pause, before coming again
           s.pause -= dt;
           if (s.pause > 0.8) {
@@ -193,8 +209,9 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider, cfg 
         const above = player.pos.y - s.pos.y;
         if (dh < R + 0.3 && above < H + 0.15 && above > -0.4) {
           if (player.velY < -1.5 && above > H * 0.45) {
-            defeat(s); result = 'stomp';
-          } else if (canBeHurt && !result) {
+            if (DEFEATABLE) { defeat(s); result = 'stomp'; }
+            else result = 'bounce'; // landed on it: boing, no harm done
+          } else if (canBeHurt && !result && !calm(s)) {
             result = 'hurt'; from = s.pos.clone();
             s.pause = 1.6;
           }
@@ -202,7 +219,7 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider, cfg 
 
         s.v.root.position.copy(s.pos);
         s.v.root.rotation.y = s.yaw;
-        s.v.update(dt, s.speed / 2.5);
+        s.v.update(dt, s.speed / 2.5, s.state);
       }
       for (let i = poofs.length - 1; i >= 0; i--) {
         const p = poofs[i];
@@ -214,23 +231,44 @@ export function createTarantulas(scene, colliders, pebbleSpots, makeSpider, cfg 
       }
       return { result, from };
     },
-    // Lizard bites: any spider just in front of the snout is defeated. Returns how many.
+    // Lizard bites whatever is just in front of the snout. Returns how many were defeated
+    // and how many shrugged it off (enemies that can't be defeated).
     bite(pos, yaw) {
       const fx = Math.sin(yaw), fz = Math.cos(yaw);
-      let n = 0;
+      let defeated = 0, shrugged = 0;
       for (const s of spiders) {
         if (!s.alive) continue;
         const dx = s.pos.x - pos.x, dz = s.pos.z - pos.z, d = Math.hypot(dx, dz);
         if (d < BITE_RANGE + R && Math.abs(s.pos.y - pos.y) < 0.8 && (dx * fx + dz * fz) / (d || 1) > 0.35) {
-          defeat(s); n++;
+          if (DEFEATABLE) { defeat(s); defeated++; } else shrugged++;
         }
+      }
+      return { defeated, shrugged };
+    },
+    // Push-up display: scareable enemies within range bolt for home and leave the lizard
+    // alone for `duration` seconds. Returns how many were scared.
+    scare(pos, range = 6, duration = 12) {
+      if (!SCAREABLE) return 0;
+      let n = 0;
+      for (const s of spiders) {
+        if (!s.alive || Math.hypot(s.pos.x - pos.x, s.pos.z - pos.z) > range) continue;
+        s.state = 'scared'; s.hold = duration; s.pause = 0; n++;
+      }
+      return n;
+    },
+    // A dropped tail at pos: enemies within range go for it instead of the lizard.
+    distract(pos, range = 12, duration = 6) {
+      let n = 0;
+      for (const s of spiders) {
+        if (!s.alive || Math.hypot(s.pos.x - pos.x, s.pos.z - pos.z) > range) continue;
+        s.state = 'tail'; s.hold = duration; s.pause = 0; s.goal.set(pos.x, pos.z); n++;
       }
       return n;
     },
     reset() {
       for (const s of spiders) {
         s.alive = true; s.v.root.visible = true; s.v.root.scale.set(1, 1, 1);
-        s.pos.set(s.home.x, terrainHeight(s.home.x, s.home.y), s.home.y); s.state = 'wander'; s.pause = 0;
+        s.pos.set(s.home.x, terrainHeight(s.home.x, s.home.y), s.home.y); s.state = 'wander'; s.pause = 0; s.hold = 0;
       }
     },
   };

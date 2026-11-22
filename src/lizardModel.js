@@ -100,6 +100,8 @@ export async function createLizardModel(url = '/assets/lizard.glb') {
     root,
     body,
     realistic: true,
+    // k: 1 = full tail, 0 = dropped (a stump); in between while it grows back
+    setTail(k) { tail[0]?.scale.setScalar(Math.max(0.001, k)); },
     update(dt, { speed = 0, climbing = false, pushups = false, airborne = false, bite = 0 }) {
       idleT += dt;
       const moving = speed > 0.1;

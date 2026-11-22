@@ -6,5 +6,8 @@ dist/
 .vercel
 .env*
 
+# scratch from planning tools
+.superpowers/
+
 # macOS
 .DS_Store

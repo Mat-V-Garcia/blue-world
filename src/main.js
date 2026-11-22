@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { terrainHeight, footprint } from './world.js';
-import { LEVELS, currentLevelId, unlockedLevel, unlockLevel } from './levels/index.js';
+import { LEVELS, currentLevelId, unlockedLevel, unlockLevel, migrateUnlocks } from './levels/index.js';
+import { loadKittenModel, createSimpleKitten } from './kittenModel.js';
 import { loadPigeonModel, createSimplePigeon } from './pigeonModel.js';
 import { createLizard } from './lizard.js';
 import { createLizardModel } from './lizardModel.js';
@@ -10,6 +11,7 @@ import { createTouchControls, isTouchDevice } from './touch.js';
 import { Player, CLING_GAP } from './player.js';
 import { createPebbles, createDust } from './pebbles.js';
 import { sfx } from './audio.js';
+import { createTailDrop } from './tail.js';
 
 const TOTAL = 10;
 const $ = (id) => document.getElementById(id);
@@ -55,12 +57,13 @@ let jumpPressed = false;
 addEventListener('keydown', (e) => {
   if (e.code === 'Space') { if (!keys.Space) jumpPressed = true; e.preventDefault(); }
   if (e.code === 'KeyF' && !keys.KeyF) bitePressed = true;
+  if (e.code === 'KeyQ' && !keys.KeyQ) tailPressed = true;
   keys[e.code] = true;
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 // If the window loses focus while a key is held we never get its keyup, which left
 // actions (like push-ups) stuck on. Release everything when focus goes away.
-const releaseAll = () => { for (const k in keys) keys[k] = false; jumpPressed = false; bitePressed = false; touch?.releaseAll(); };
+const releaseAll = () => { for (const k in keys) keys[k] = false; jumpPressed = false; bitePressed = false; tailPressed = false; touch?.releaseAll(); };
 addEventListener('blur', releaseAll);
 document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
 document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement) releaseAll(); });
@@ -115,18 +118,28 @@ document.addEventListener('pointerlockchange', () => {
 
 // ---------- Game objects ----------
 let state = 'loading';
-let world, player, lizard, pebbles, dust, tarantulas;
+let world, player, lizard, pebbles, dust, tarantulas, tail;
 let collected = 0;
 // Health: 3 hearts. A touch costs one; they refill slowly if you stay out of trouble.
 const MAX_HEARTS = 3, INVULN_TIME = 1.6, REGEN_DELAY = 8, REGEN_EVERY = 10;
 let hearts = MAX_HEARTS, invuln = 0, sinceHit = 99, regenT = 0;
 let biteT = 0, biteCD = 0, bitePressed = false;
+let tailPressed = false, scareT = 0; // scareT: how long the current push-ups have gone on
+const KITTEN_HINT = "Kittens don't mind! Try push-ups or drop your tail";
 const camTarget = new THREE.Vector3();
 const camRay = new THREE.Raycaster();
 const camDir = new THREE.Vector3();
 
+migrateUnlocks(); // before anything asks which levels are open
 const LEVEL_ID = currentLevelId();
 const LEVEL = LEVELS[LEVEL_ID - 1];
+
+// enemy kind -> [load the 3D model, make the simple stand-in]
+const ENEMY_MODELS = {
+  tarantula: [loadSpiderModel, createSimpleSpider],
+  pigeon: [loadPigeonModel, createSimplePigeon],
+  kitten: [loadKittenModel, createSimpleKitten],
+};
 
 async function init() {
   setupTitle();
@@ -141,9 +154,9 @@ async function init() {
   }
   scene.add(lizard.root);
   dust = createDust(scene);
-  // Each level picks its enemy: tarantulas in the desert, pigeons at the shops.
+  // Each level picks its enemy: tarantulas in the desert, pigeons at the shops, kittens in the yard.
   const foe = world.enemies || { kind: 'tarantula' };
-  const [loadModel, simple] = foe.kind === 'pigeon' ? [loadPigeonModel, createSimplePigeon] : [loadSpiderModel, createSimpleSpider];
+  const [loadModel, simple] = ENEMY_MODELS[foe.kind] || ENEMY_MODELS.tarantula;
   let makeEnemy = simple;
   try {
     makeEnemy = await loadModel();
@@ -151,6 +164,12 @@ async function init() {
     console.warn(`${foe.kind} model failed to load, using the simple one`, err);
   }
   tarantulas = createTarantulas(scene, world.colliders, world.pebbleSpots, makeEnemy, foe);
+  // a dropped tail lands on whatever is under the lizard (ground, or a prop top below it)
+  tail = createTailDrop(scene, (x, z, y) => {
+    let g = terrainHeight(x, z);
+    for (const c of world.colliders) if (c.top <= y + 0.05 && c.top > g && footprint(c, x, z).dist <= 0) g = c.top;
+    return g;
+  });
   reset();
   state = 'title';
   renderer.setAnimationLoop(loop);
@@ -176,6 +195,7 @@ function reset() {
   hearts = MAX_HEARTS; invuln = 0; sinceHit = 99;
   drawHearts();
   tarantulas?.reset();
+  tail?.reset();
 }
 
 function drawHearts() {
@@ -202,6 +222,7 @@ function getHurt(from) {
       camYaw = player.yaw + Math.PI; moveBasisYaw = camYaw;
       camTarget.copy(player.pos);
       hearts = MAX_HEARTS; invuln = 2.5;
+      tail.reset();
       drawHearts();
       $('flash').classList.remove('show');
     }, 450);
@@ -238,6 +259,9 @@ function setupTitle() {
   document.title = LEVEL_ID === 1 ? 'Blue World' : `Blue World · ${LEVEL.name}`;
   $('level-name').textContent = `Level ${LEVEL_ID} · ${LEVEL.name}`;
   $('level-intro').textContent = LEVEL.intro;
+  $('hint').textContent = LEVEL.hint;
+  $('help').textContent = LEVEL.help;
+  $('help-touch').textContent = LEVEL.helpTouch;
   document.querySelector('#title .art').style.backgroundImage = `url('${LEVEL.title}')`;
   const open = unlockedLevel();
   $('levels').innerHTML = LEVELS.map((l) => {
@@ -264,8 +288,10 @@ function toast(msg) {
 const clock = new THREE.Clock();
 let t = 0, pushTick = 0, dustTick = 0;
 
-function loop() {
-  const dt = Math.min(clock.getDelta(), 1 / 30);
+function loop() { frame(Math.min(clock.getDelta(), 1 / 30)); }
+
+// One step of the game. Split from loop() so tests can step it by hand (__game.frame).
+function frame(dt) {
   t += dt;
   const playing = state === 'play';
 
@@ -297,6 +323,7 @@ function loop() {
   }
   if (touch.consumeJump()) jumpPressed = true;
   if (touch.consumeBite()) bitePressed = true;
+  if (touch.consumeTail()) tailPressed = true;
   const pushups = playing && (keys.KeyE || touch.state.pushups) && player.onGround && !player.climbing && Math.hypot(ix, iz) === 0;
   const wasGround = player.onGround;
   player.update(dt, { x: ix, z: iz, sprint: keys.ShiftLeft || keys.ShiftRight || touch.state.sprint, jump: playing && jumpPressed });
@@ -310,15 +337,40 @@ function loop() {
   if (playing && bitePressed && biteCD <= 0 && !player.climbing) {
     biteT = 0.001; biteCD = 0.45;
     sfx.bite();
-    if (tarantulas.bite(player.pos, player.yaw)) { sfx.stomp(); toast('Chomp!'); }
+    const bit = tarantulas.bite(player.pos, player.yaw);
+    if (bit.defeated > 0) { sfx.stomp(); toast('Chomp!'); }
+    else if (bit.shrugged > 0) toast(KITTEN_HINT);
   }
   bitePressed = false;
+
+  // ---- Tail drop (Q): leave the tail behind wriggling; enemies nearby go for it
+  // (it comes off where the tail was: a little behind the body)
+  const tailAt = new THREE.Vector3(player.pos.x - Math.sin(player.yaw) * 0.6, player.pos.y, player.pos.z - Math.cos(player.yaw) * 0.6);
+  if (playing && tailPressed && tail.drop(player.climbing ? player.pos : tailAt, player.yaw)) {
+    tarantulas.distract(tail.pos);
+    sfx.tail(); toast('Dropped your tail!');
+  }
+  tailPressed = false;
+  tail.update(dt);
+  lizard.setTail(tail.grown);
+  $('tail').classList.toggle('growing', !tail.ready);
+  $('tail').textContent = tail.ready ? 'Tail ready' : 'Tail growing…';
+
+  // ---- Push-ups as a threat display: a couple of bobs scares off anything scareable nearby
+  scareT = pushups ? scareT + dt : 0;
+  if (scareT >= 0.7) {
+    scareT = 0;
+    if (tarantulas.scare(player.pos) > 0) { sfx.scare(); toast('Scared it off!'); }
+  }
 
   // ---- Tarantulas: stomp them from above, or get hurt if they touch you
   const spiderHit = tarantulas.update(dt, player, playing && invuln <= 0 && state === 'play');
   if (spiderHit.result === 'stomp') {
     player.velY = 8.5; player.onGround = false; // bounce off
     sfx.stomp(); toast('Squish!');
+  } else if (spiderHit.result === 'bounce') {
+    player.velY = 8.5; player.onGround = false; // boing: the kitten is fine
+    sfx.jump(); toast(KITTEN_HINT);
   } else if (spiderHit.result === 'hurt') {
     getHurt(spiderHit.from);
   }
@@ -428,4 +480,4 @@ function loop() {
 
 init();
 // handy for debugging / testing in the console
-window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, start };
+window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, start, frame };
