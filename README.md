@@ -24,7 +24,7 @@ Then open http://localhost:5173.
 ## Controls
 WASD move · Mouse look (click the game to capture the mouse) · Space jump · F bite · Q drop tail · Shift sprint · E push-ups · Mouse wheel zoom.
 
-Tarantulas wander the desert and chase you if you get close. Jump on them or bite them (F). A touch costs one of your 3 hearts; lose them all and you restart at the start point, keeping your pebbles. Hearts refill slowly.
+Tarantulas wander the desert and chase you if you get close. Jump on them or bite them (F). A touch costs one of your 5 hearts; lose them all and you restart at the start point, keeping your pebbles. Hearts refill slowly.
 
 **Drop your tail (Q)** on any level: it stays behind wriggling for a few seconds and nearby enemies go for it instead of you. It grows back after about 30 seconds (the HUD shows "Tail ready").
 

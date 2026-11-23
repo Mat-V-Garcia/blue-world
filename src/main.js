@@ -127,8 +127,8 @@ let collected = 0;
 let boss = null, storm = null, stuckTold = false, strands = null;
 const splats = [];
 const BOSS_WAIT = 'Wait until its fangs are stuck!';
-// Health: 3 hearts. A touch costs one; they refill slowly if you stay out of trouble.
-const MAX_HEARTS = 3, INVULN_TIME = 1.6, REGEN_DELAY = 8, REGEN_EVERY = 10;
+// Health: 5 hearts. A touch costs one; they refill slowly if you stay out of trouble.
+const MAX_HEARTS = 5, INVULN_TIME = 1.6, REGEN_DELAY = 8, REGEN_EVERY = 10;
 let hearts = MAX_HEARTS, invuln = 0, sinceHit = 99, regenT = 0;
 let biteT = 0, biteCD = 0, bitePressed = false;
 let tailPressed = false, scareT = 0; // scareT: how long the current push-ups have gone on
