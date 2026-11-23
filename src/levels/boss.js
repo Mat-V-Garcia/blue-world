@@ -117,7 +117,17 @@ export async function build(scene) {
     pebbleSpots: PEBBLES.map((p) => ({ x: p.x, z: p.z, y: terrainHeight(p.x, p.z) + p.up + 0.6, hint: p.hint })),
     spawn: { x: 0, z: -32, yaw: 0 },
     enemies: { kind: 'tarantula', count: 0 }, // no small ones (a level that says nothing gets six)
-    boss: { x: 0, z: 0, health: 6, scale: 5, hidden: true }, // under the sand until the tenth pebble
+    boss: { // under the sand until the tenth pebble
+      x: 0, z: 0, health: 6, scale: 5, hidden: true,
+      text: {
+        name: 'Giant Tarantula',
+        wake: 'The ground is shaking…',
+        stuck: 'Its fangs are stuck! Jump on its back!',
+        wait: 'Wait until its fangs are stuck!',
+        winTitle: 'You beat the Giant Tarantula!',
+        winMsg: 'The desert is safe again.',
+      },
+    },
     update() {},
   };
 }

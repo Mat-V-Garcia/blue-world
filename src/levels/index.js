@@ -15,6 +15,7 @@ export const LEVELS = [
   {
     id: 2,
     boss: true, // collecting the pebbles wakes the boss; the level is won by beating it
+    icon: '🕷',
     name: 'The Giant Tarantula',
     intro: 'Ten golden pebbles lie in a quiet desert arena. But something huge is sleeping under the sand, and the last pebble will wake it. Only one small lizard can send it back!',
     title: '/assets/title-boss.jpg',
@@ -35,6 +36,18 @@ export const LEVELS = [
   },
   {
     id: 4,
+    boss: true,
+    icon: '🦅',
+    name: 'The Peregrine Falcon',
+    intro: 'The pigeons have all flown off, and the shops have gone very quiet. Ten golden pebbles lie out in the open. High on the clock tower, a peregrine falcon is watching, and the last pebble will bring it down!',
+    title: '/assets/title-mall.jpg',
+    hint: 'Collect the 10 pebbles to bring the falcon down · Run out of the red ring when it dives · Jump on its back while it is on the ground · Q drop tail to trick it',
+    help: 'Collect all ten pebbles and the falcon leaves the clock tower · Watch its shadow and run out of the red ring when it dives · Jump on its back while it is on the ground · Q drops your tail to trick it · Under a car or a bench it cannot reach you',
+    helpTouch: 'Collect all ten pebbles and the falcon leaves the clock tower · Run out of the red ring when it dives, then Jump onto its back while it is on the ground · Tail tricks it · Under a car it cannot reach you',
+    load: () => import('./falcon.js'),
+  },
+  {
+    id: 5,
     name: 'The Back Yard',
     intro: 'You slipped under the fence into a sunny back yard. Ten golden pebbles are hidden around the patio, the swings and the lemon tree. The alley kittens only want to play, but they play rough!',
     title: '/assets/title-yard.jpg',
@@ -46,7 +59,7 @@ export const LEVELS = [
 ];
 
 // What a level is called on screen: the boss has no number, so the levels after it
-// keep counting from where the desert left off (Level 1, Boss, Level 2, Level 3).
+// keep counting past each boss (Level 1, Boss, Level 2, Boss, Level 3).
 export function levelLabel(level) {
   if (level.boss) return 'Boss';
   return `Level ${LEVELS.filter((l) => !l.boss && l.id <= level.id).length}`;
@@ -65,6 +78,7 @@ export function unlockLevel(id) {
 // Level 2 open gets Level 3 too instead of having to replay Level 2.
 const L3_FLAG = 'blueworld.l3open';
 const ORDER_FLAG = 'blueworld.bossSecond';
+const FALCON_FLAG = 'blueworld.falconFourth';
 export function migrateUnlocks(store) {
   try {
     const storage = store ?? localStorage; // inside the try: some browsers throw just reading it
@@ -77,8 +91,15 @@ export function migrateUnlocks(store) {
     // one: whoever had the Shops or the Back Yard open keeps them (and gets the boss).
     if (!storage.getItem(ORDER_FLAG)) {
       const n = Number(storage.getItem(KEY));
-      if (n >= 2) storage.setItem(KEY, String(Math.min(LEVELS.length, n + 1)));
+      if (n >= 2) storage.setItem(KEY, String(Math.min(4, n + 1))); // there were four levels then
       storage.setItem(ORDER_FLAG, '1');
+    }
+    // Then the falcon boss arrived between the Shops and the Back Yard. Once per browser,
+    // whoever already had the Back Yard open keeps it (and gets the falcon).
+    if (!storage.getItem(FALCON_FLAG)) {
+      const n = Number(storage.getItem(KEY));
+      if (n >= 4) storage.setItem(KEY, String(Math.min(LEVELS.length, n + 1)));
+      storage.setItem(FALCON_FLAG, '1');
     }
   } catch { /* private mode etc. */ }
 }

@@ -52,7 +52,8 @@ export async function build(scene) {
     loadTexture('asphalt.jpg'), loadTexture('sidewalk.jpg'), loadTexture('stucco.jpg'),
     loadTexture('shops1.jpg'), loadTexture('shops2.jpg'), loadTexture('sky.jpg'),
   ]);
-  const horizonColor = await buildSky(scene, skyTex);
+  const sky = {}; // handles for the falcon boss's storm (this level ignores them)
+  const horizonColor = await buildSky(scene, skyTex, sky);
   const rand = rng(11);
   const colliders = [], solids = [];
   const add = (m, solid = true) => { m.traverse?.((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); scene.add(m); if (solid) solids.push(m); return m; };
@@ -377,6 +378,7 @@ export async function build(scene) {
     colliders,
     solids,
     horizonColor,
+    sky,
     pebbleSpots,
     spawn: { x: 2, z: -2, yaw: Math.PI * 0.85 }, // looking into the plaza
     enemies: {

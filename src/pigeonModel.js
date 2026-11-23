@@ -106,9 +106,10 @@ export async function loadPigeonModel(url = '/assets/pigeon.glb') {
     let phase = Math.random() * 10, idle = Math.random() * 10, flap = 0;
     return {
       root,
-      update(dt, speed) {
+      // mode (the falcon boss only): 'fly' = wings beating, legs still; 'dive' = wings tucked
+      update(dt, speed, mode) {
         idle += dt;
-        const g = Math.min(1, speed);
+        const g = mode ? 0 : Math.min(1, speed);
         phase += dt * (5 + speed * 7);
         // waddle: legs swing forward/back
         const s = Math.sin(phase) * 0.55 * g;
@@ -116,12 +117,12 @@ export async function loadPigeonModel(url = '/assets/pigeon.glb') {
         pose(kneeR, [[Z, -Math.max(0, s) * 0.6]]); pose(kneeL, [[Z, -Math.max(0, -s) * 0.6]]);
         // the classic pigeon head-bob while walking; little pecks at the ground when idle
         const bob = g > 0.05 ? -Math.max(0, Math.sin(phase)) * 0.35 : 0;
-        const peck = g <= 0.05 ? -(Math.max(0, Math.sin(idle * 1.6)) ** 12) * 1.1 : 0;
+        const peck = g <= 0.05 && !mode ? -(Math.max(0, Math.sin(idle * 1.6)) ** 12) * 1.1 : 0;
         pose(neck, [[Z, bob + peck]]);
         pose(head, [[Z, peck * 0.3]]);
         // wings flap when rushing at you (fast), otherwise stay folded
-        flap = THREE.MathUtils.lerp(flap, speed > 2.5 ? 1 : 0, Math.min(1, dt * 6));
-        const w = (Math.sin(idle * 22) * 0.5 + 0.5) * 0.9 * flap;
+        flap = THREE.MathUtils.lerp(flap, mode === 'fly' || (!mode && speed > 2.5) ? 1 : 0, Math.min(1, dt * 6));
+        const w = (Math.sin(idle * (mode ? 13 : 22)) * 0.5 + 0.5) * (mode ? 1.3 : 0.9) * flap;
         pose(wingR, [[X, -w]]); pose(wingL, [[X, w]]);
         pose(tail, [[Z, Math.sin(phase) * 0.1 * g]]);
         // body sway side to side with each step

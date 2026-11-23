@@ -36,6 +36,7 @@ function noise(start, dur, gain = 0.15, freq = 800, type = 'lowpass') {
 }
 
 export const sfx = {
+  screech() { tone(2300, 0, 0.22, 'sawtooth', 0.07, 1500); tone(2500, 0.2, 0.35, 'sawtooth', 0.07, 1200); },
   hiss() { noise(0, 0.5, 0.1, 3500, 'highpass'); },
   web() { noise(0, 0.18, 0.08, 2000, 'bandpass'); tone(900, 0, 0.18, 'sine', 0.05, 300); },
   webbed() { tone(500, 0, 0.12, 'triangle', 0.1, 250); tone(250, 0.1, 0.2, 'triangle', 0.08, 120); },

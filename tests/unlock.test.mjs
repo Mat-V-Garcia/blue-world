@@ -10,7 +10,7 @@ const store = (init) => {
 test('players from before the Back Yard existed (Shops open) get the Back Yard, once', () => {
   const s = store({ 'blueworld.unlocked': '2' });
   migrateUnlocks(s);
-  assert.equal(s.m.get('blueworld.unlocked'), '4'); // the Back Yard is now id 4
+  assert.equal(s.m.get('blueworld.unlocked'), '5'); // the Back Yard is now id 5
   assert.ok(s.m.get('blueworld.l3open'));
 });
 
@@ -59,21 +59,28 @@ test('asking for the boss by address falls back to Level 3 until it is unlocked'
 import { LEVELS, levelLabel } from '../src/levels/index.js';
 
 test('level order: the boss comes straight after the desert', () => {
-  assert.deepEqual(LEVELS.map((l) => l.name), ['The Desert', 'The Giant Tarantula', 'Fullerton Shops', 'The Back Yard']);
-  assert.deepEqual(LEVELS.map((l) => l.id), [1, 2, 3, 4]);
-  assert.deepEqual(LEVELS.map(levelLabel), ['Level 1', 'Boss', 'Level 2', 'Level 3']);
+  assert.deepEqual(LEVELS.map((l) => l.name), ['The Desert', 'The Giant Tarantula', 'Fullerton Shops', 'The Peregrine Falcon', 'The Back Yard']);
+  assert.deepEqual(LEVELS.map((l) => l.id), [1, 2, 3, 4, 5]);
+  assert.deepEqual(LEVELS.map(levelLabel), ['Level 1', 'Boss', 'Level 2', 'Boss', 'Level 3']);
 });
 
 test('old saves keep the levels they had open after the re-order, once', () => {
   const after = (n) => { const s = store({ 'blueworld.unlocked': String(n), 'blueworld.l3open': '1' }); migrateUnlocks(s); migrateUnlocks(s); return s.m.get('blueworld.unlocked'); };
   assert.equal(after(1), '1'); // only the desert: the boss still has to be earned
   assert.equal(after(2), '3'); // had the Shops
-  assert.equal(after(3), '4'); // had the Back Yard
-  assert.equal(after(4), '4'); // had everything
+  assert.equal(after(3), '5'); // had the Back Yard (now id 5, past the falcon)
+  assert.equal(after(4), '5'); // had everything
 });
 
 test('a brand-new player starts with only the desert', () => {
   const s = store({});
   migrateUnlocks(s);
   assert.equal(s.m.has('blueworld.unlocked'), false);
+});
+
+// The falcon boss then arrived between the Shops and the Back Yard.
+test('saves from before the falcon keep the Back Yard, once; the falcon has to be earned otherwise', () => {
+  const after = (n) => { const s = store({ 'blueworld.unlocked': String(n), 'blueworld.l3open': '1', 'blueworld.bossSecond': '1' }); migrateUnlocks(s); migrateUnlocks(s); return s.m.get('blueworld.unlocked'); };
+  assert.equal(after(3), '3'); // had the Shops: the falcon is still locked
+  assert.equal(after(4), '5'); // had the Back Yard
 });

@@ -13,6 +13,7 @@ import { createPebbles, createDust } from './pebbles.js';
 import { sfx } from './audio.js';
 import { createTailDrop } from './tail.js';
 import { createBoss, BOSS } from './boss.js';
+import { createFalcon } from './falcon.js';
 import { createStorm, stormLevel } from './storm.js';
 
 const TOTAL = 10;
@@ -126,7 +127,6 @@ let collected = 0;
 // Boss level only: the giant tarantula, the storm it brings, and bits of web
 let boss = null, storm = null, stuckTold = false, strands = null;
 const splats = [];
-const BOSS_WAIT = 'Wait until its fangs are stuck!';
 // Health: 5 hearts. A touch costs one; they refill slowly if you stay out of trouble.
 const MAX_HEARTS = 5, INVULN_TIME = 1.6, REGEN_DELAY = 8, REGEN_EVERY = 10;
 let hearts = MAX_HEARTS, invuln = 0, sinceHit = 99, regenT = 0;
@@ -178,7 +178,8 @@ async function init() {
     return g;
   });
   if (world.boss) {
-    boss = createBoss(scene, world.colliders, makeEnemy, world.boss);
+    boss = (world.boss.kind === 'falcon' ? createFalcon : createBoss)(scene, world.colliders, makeEnemy, world.boss);
+    document.querySelector('#bossbar span').textContent = world.boss.text.name;
     storm = createStorm(scene, { sky: world.sky, fog: scene.fog, hemi, sun });
     document.body.classList.add('boss');
     // web strands shown round the lizard while it is webbed
@@ -221,7 +222,7 @@ function reset() {
 function drawBoss() {
   if (!boss) return;
   $('bossfill').style.width = `${(boss.health / boss.maxHealth) * 100}%`;
-  // while it sleeps under the sand the pebble counter shows; once it is out, its health bar
+  // until the boss comes out the pebble counter shows; once it is out, its health bar
   const out = boss.state !== 'hidden';
   $('bossbar').classList.toggle('hidden', !out);
   document.querySelector('.counter').classList.toggle('hidden', out);
@@ -244,7 +245,7 @@ function getHurt(from) {
   setTimeout(() => h.classList.remove('shake'), 400);
   if (hearts <= 0) {
     // out of hearts: back to the start, pebbles kept. On the boss level the whole level
-    // starts over instead: pebbles back, boss asleep under the sand with full health.
+    // starts over instead: pebbles back, boss waiting again with full health.
     toast(boss ? 'Ouch! Starting the level again' : 'Ouch! Back to the start');
     $('flash').classList.add('show');
     setTimeout(() => {
@@ -303,7 +304,7 @@ function setupTitle() {
   $('levels').innerHTML = LEVELS.map((l) => {
     const locked = l.id > open, here = l.id === LEVEL_ID;
     return `<button class="lvl${here ? ' here' : ''}" data-id="${l.id}" ${locked ? 'disabled' : ''}>`
-      + `${locked ? '🔒' : l.boss ? '🕷' : levelLabel(l).slice(6)} <span>${l.name}</span></button>`;
+      + `${locked ? '🔒' : l.boss ? l.icon : levelLabel(l).slice(6)} <span>${l.name}</span></button>`;
   }).join('');
   $('levels').querySelectorAll('button:not([disabled])').forEach((b) => {
     b.onclick = () => { if (Number(b.dataset.id) !== LEVEL_ID) goToLevel(Number(b.dataset.id), false); };
@@ -334,12 +335,14 @@ function bossFrame(dt, playing) {
     storm.set(stormLevel(boss.health, boss.maxHealth));
     if (!ev.defeated) toast('Got it!');
   }
-  if (ev.bounced) { bounce(); sfx.jump(); toast(BOSS_WAIT); }
+  if (ev.bounced) { bounce(); sfx.jump(); toast(world.boss.text.wait); }
   if (ev.stuckNow) {
     sfx.stuck();
-    if (!stuckTold) { stuckTold = true; toast('Its fangs are stuck! Jump on its back!'); }
+    if (ev.bonked) { toast('Bonk!'); dust.puff(boss.pos, 8, 1.5); }
+    else if (!stuckTold) { stuckTold = true; toast(world.boss.text.stuck); }
   }
   if (ev.windupNow === 'lunge') sfx.hiss();
+  if (ev.windupNow === 'dive') sfx.screech();
   if (ev.shotNow) sfx.web();
   if (ev.splat) {
     const m = new THREE.Mesh(splatGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false }));
@@ -354,10 +357,10 @@ function bossFrame(dt, playing) {
     setTimeout(() => sfx.win(), 1500);
     setTimeout(() => {
       document.exitPointerLock?.();
-      $('win-title').textContent = 'You beat the Giant Tarantula!';
+      $('win-title').textContent = world.boss.text.winTitle;
       const next = LEVELS[LEVEL_ID]; // the level after the boss, if there is one
       if (next) unlockLevel(next.id);
-      $('win-msg').textContent = next ? `The desert is safe again. ${levelLabel(next)} · ${next.name} is unlocked!` : 'Blue World is safe again. Do a victory push-up!';
+      $('win-msg').textContent = next ? `${world.boss.text.winMsg} ${levelLabel(next)} · ${next.name} is unlocked!` : 'Blue World is safe again. Do a victory push-up!';
       $('next').classList.toggle('hidden', !next);
       $('win').classList.remove('hidden');
     }, 3000);
@@ -427,7 +430,7 @@ function frame(dt) {
     const bit = tarantulas.bite(player.pos, player.yaw);
     if (bit.defeated > 0) { sfx.stomp(); toast('Chomp!'); }
     else if (bit.shrugged > 0) toast(KITTEN_HINT);
-    else if (boss && boss.state !== 'defeated' && Math.hypot(boss.pos.x - player.pos.x, boss.pos.z - player.pos.z) < BOSS.BODY_R + 1.5) toast(BOSS_WAIT);
+    else if (boss && boss.state !== 'defeated' && Math.hypot(boss.pos.x - player.pos.x, boss.pos.z - player.pos.z) < (boss.bodyR ?? BOSS.BODY_R) + 1.5) toast(world.boss.text.wait);
   }
   bitePressed = false;
 
@@ -510,13 +513,13 @@ function frame(dt) {
     c.classList.add('bump');
     setTimeout(() => c.classList.remove('bump'), 150);
     sfx.pickup(collected);
-    toast(collected === TOTAL ? (boss ? 'The ground is shaking…' : 'All the pebbles!') : `+1 · ${got.hint}`);
+    toast(collected === TOTAL ? (boss ? world.boss.text.wake : 'All the pebbles!') : `+1 · ${got.hint}`);
     if (collected === TOTAL && boss) {
-      // boss level: the last pebble wakes the giant tarantula
+      // boss level: the last pebble brings the boss out
       if (boss.emerge()) {
         drawBoss();
-        dust.puff(boss.pos, 40, 3.5);
-        sfx.thunder(); sfx.hiss();
+        if (world.boss.kind === 'falcon') sfx.screech();
+        else { dust.puff(boss.pos, 40, 3.5); sfx.thunder(); sfx.hiss(); }
       }
     } else if (collected === TOTAL) {
       state = 'win';

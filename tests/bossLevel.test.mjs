@@ -17,10 +17,12 @@ test('boulders are low cover, clear of the middle and of the start', () => {
     assert.ok(Math.hypot(b.x, b.z + 32) >= 8);
   }
 });
-test('the boss is the second of four levels', () => {
-  assert.equal(LEVELS.length, 4);
+test('the tarantula is second and the falcon fourth of five levels', () => {
+  assert.equal(LEVELS.length, 5);
   assert.equal(LEVELS[1].boss, true);
-  assert.equal(LEVELS.filter((l) => l.boss).length, 1);
+  assert.equal(LEVELS[3].boss, true);
+  assert.equal(LEVELS.filter((l) => l.boss).length, 2);
+  for (const l of LEVELS.filter((x) => x.boss)) assert.ok(l.icon);
 });
 
 import { PEBBLES } from '../src/levels/boss.js';
@@ -32,4 +34,15 @@ test('ten pebbles in the arena, spread out, none where the boss comes up', () =>
     assert.ok(p.hint);
     for (const q of PEBBLES.slice(i + 1)) assert.ok(Math.hypot(p.x - q.x, p.z - q.z) >= 6);
   }
+});
+
+import { PEBBLES as FALCON_PEBBLES, PERCH } from '../src/levels/falcon.js';
+test('falcon level: ten pebbles spread round the shops, low enough to reach from the ground', () => {
+  assert.equal(FALCON_PEBBLES.length, 10);
+  for (const [i, p] of FALCON_PEBBLES.entries()) {
+    assert.ok(Math.hypot(p.x, p.z) <= 60, `pebble ${i}`);
+    assert.ok(p.hint && p.up >= 0.5 && p.up <= 0.6);
+    for (const q of FALCON_PEBBLES.slice(i + 1)) assert.ok(Math.hypot(p.x - q.x, p.z - q.z) >= 6);
+  }
+  assert.ok(PERCH.y > 25);
 });
