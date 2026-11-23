@@ -34,16 +34,17 @@ export function createStorm(scene, { sky, fog, hemi, sun }, rand = Math.random) 
   const boltMat = new THREE.MeshBasicMaterial({ color: 0xfff0dc, fog: false });
   let target = 0, next = null, flash = 0, bolt = null, boltT = 0;
 
-  function strike() {
-    const a = rand() * Math.PI * 2, R = 300;
+  // lookYaw (optional): the way the camera faces, so bolts land where they can be seen
+  function strike(lookYaw) {
+    const a = lookYaw === undefined ? rand() * Math.PI * 2 : lookYaw + (rand() - 0.5) * 1.6, R = 300;
     bolt = new THREE.Group();
-    let x = 0, y = 190;
-    while (y > 20) { // a jagged line of short segments coming down
+    let x = 0, y = 150;
+    while (y > 12) { // a jagged line of short segments coming down
       const ny = y - (14 + rand() * 16), nx = x + (rand() - 0.5) * 30;
       const len = Math.hypot(nx - x, ny - y);
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(1.6, len, 1.6), boltMat);
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(2.4, len + 1, 2.4), boltMat);
       seg.position.set((x + nx) / 2, (y + ny) / 2, 0);
-      seg.rotation.z = Math.atan2(-(nx - x), -(ny - y)) + Math.PI;
+      seg.rotation.z = Math.atan2(-(nx - x), ny - y); // box's long (Y) axis along the segment
       bolt.add(seg);
       x = nx; y = ny;
     }
@@ -56,7 +57,7 @@ export function createStorm(scene, { sky, fog, hemi, sun }, rand = Math.random) 
   const storm = {
     level: 0,
     set(t) { target = Math.min(1, Math.max(0, t)); },
-    update(dt) {
+    update(dt, lookYaw) {
       const d = target - storm.level;
       storm.level += Math.sign(d) * Math.min(Math.abs(d), dt); // eases at 1 per second
       const k = storm.level;
@@ -69,7 +70,7 @@ export function createStorm(scene, { sky, fog, hemi, sun }, rand = Math.random) 
       let struck = false;
       if (k < 0.5) next = null;
       else if (next === null) next = lightningGap(k, rand());
-      else if ((next -= dt) <= 1e-9) { strike(); struck = true; next = lightningGap(k, rand()); }
+      else if ((next -= dt) <= 1e-9) { strike(lookYaw); struck = true; next = lightningGap(k, rand()); }
       return { bolt: struck };
     },
     reset() {

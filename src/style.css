@@ -96,3 +96,10 @@ body.touch-mode .mouse-only { display: none; }
 .lvl[disabled] { opacity: .5; cursor: not-allowed; filter: grayscale(.6); }
 .win-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
 button.secondary { background: #fff; color: #1d6fb0; box-shadow: 0 5px 0 #d79a6a; }
+
+/* ---------- Boss health bar ---------- */
+.bossbar { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); width: 40%; text-align: center; font-size: 17px; font-weight: 700; color: #fff; text-shadow: 0 2px 0 #7a2a1c; }
+.bossbar .track { margin-top: 3px; height: 16px; border-radius: 999px; background: #fff6e8cc; box-shadow: 0 3px 0 #d79a6a; overflow: hidden; }
+.bossbar .fill { height: 100%; width: 100%; background: #d8343a; border-radius: 999px; transition: width .3s; }
+body.touch-mode .bossbar { width: 44%; top: calc(12px + env(safe-area-inset-top)); }
+body.boss .toast { top: 110px; }

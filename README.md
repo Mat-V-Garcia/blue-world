@@ -10,6 +10,8 @@ A cosy 3D browser game: you're a western fence lizard collecting 10 golden pebbl
   playhouse and swing set, a lemon tree, a shed and a white fence. Enemies: alley kittens, which can't be
   beaten, only scared off or fooled.
 
+- **Boss · The Giant Tarantula** — a walled desert arena. One giant tarantula lunges with its fangs and shoots webs; the sky turns to a red lightning storm as its health drops. Unlocked by winning Level 3.
+
 Finishing a level unlocks the next (saved in the browser). The title screen has a level picker.
 
 ## Run
@@ -25,6 +27,8 @@ WASD move · Mouse look (click the game to capture the mouse) · Space jump · F
 Tarantulas wander the desert and chase you if you get close. Jump on them or bite them (F). A touch costs one of your 3 hearts; lose them all and you restart at the start point, keeping your pebbles. Hearts refill slowly.
 
 **Drop your tail (Q)** on any level: it stays behind wriggling for a few seconds and nearby enemies go for it instead of you. It grows back after about 30 seconds (the HUD shows "Tail ready").
+
+**The boss** can only be hurt one way: dodge its lunge so its fangs stick in the sand, then jump onto its back (6 hits). Dropping your tail makes it lunge at the tail instead. A web that hits slows you and stops you jumping for a couple of seconds; boulders block webs. Bites and push-ups do nothing to it. Losing all your hearts sends you back to the start but the boss keeps its damage.
 
 **Kittens (Level 3)** are different: jumping on them or biting them does nothing. Do push-ups (E) for a moment while one is close and it bolts home for a while, or drop your tail, or get somewhere they can't follow (up high, or under the bench, table, chairs or playhouse).
 
@@ -44,7 +48,9 @@ Source: https://github.com/Mat-V-Garcia/blue-world. **Every push to `main` redep
 Manual deploy, if ever needed: `npx vercel deploy --prod --scope mathews-projects-b0ec1f40`
 
 ## Where things live
-- `src/levels/` — one file per level (`desert.js`, `mall.js`, `yard.js`) plus `index.js`, the level list, per-level help text and unlocking
+- `src/boss.js` — the giant tarantula: its moves, health and webs (reports events that `main.js` acts on)
+- `src/storm.js` — the boss fight's red sky and lightning, driven by one storm value
+- `src/levels/` — one file per level (`desert.js`, `mall.js`, `yard.js`, `boss.js`) plus `index.js`, the level list, per-level help text and unlocking
 - `src/world.js` — shared world kit: active ground, painted sky, rock shapes, collider maths
 - `src/lizard.js` — the simple block-built lizard (fallback if the 3D model fails to load)
 - `src/player.js` — movement, jumping, climbing

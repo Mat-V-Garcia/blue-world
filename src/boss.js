@@ -9,7 +9,7 @@ export const BOSS = {
   HEALTH: 6, WALK: 3, LUNGE_RANGE: 14, LUNGE_TRAVEL: 22, LUNGE_SPEED: 18, OVERSHOOT: 3,
   WINDUP: 0.8, STUCK_MAX: 2.5, STUCK_MIN: 1.8, RECOVER: 1.5,
   BODY_R: 2.2,          // touch / landing radius
-  BACK_UP: 2.6,         // back height when standing
+  BACK_UP: 2.3,         // back height when standing (the model at scale 5 is 2.34 tall)
   BACK_STUCK: 1.0,      // back height while stuck (reachable by a jump)
   WEB_RANGE: 14, WEB_WINDUP: 0.6, WEB_SPEED: 16, WEB_TIME: 2.5, WEB_COOLDOWN: 3,
   PERCH_HEIGHT: 1, PERCH_TIME: 2, TAIL_RANGE: 20, ANGRY_BELOW: 0.5, ANGRY_WINDUP: 0.75,
@@ -30,6 +30,7 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
   const boss = {
     pos: new THREE.Vector3(), yaw: 0, health: 0, maxHealth: cfg.health ?? B.HEALTH,
     state: 'approach', webs: [],
+    rig, // the model's group (for checks and debugging)
   };
   let timer = 0, rest = 0, speed = 0, pendingWindup = null;
   let webCD = 1, perch = 0, shots = 0, followUp = false; // followUp: lunge next (just webbed the lizard)
@@ -218,7 +219,7 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
     // --- pose ---
     const s = boss.state;
     const want = s === 'windup' ? { rx: -0.45, sy: 1, y: 0.5 }
-      : s === 'stuck' ? { rx: 0.28, sy: 0.42, y: 0 }
+      : s === 'stuck' ? { rx: 0.28, sy: 0.36, y: 0 }
         : s === 'webwind' ? { rx: 0.3, sy: 1, y: 0.2 }
           : s === 'defeated' ? { rx: 0, sy: 0.3, y: -B.BACK_UP * 1.4 }
           : { rx: 0, sy: 1, y: 0 };

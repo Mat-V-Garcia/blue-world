@@ -12,6 +12,8 @@ import { Player, CLING_GAP } from './player.js';
 import { createPebbles, createDust } from './pebbles.js';
 import { sfx } from './audio.js';
 import { createTailDrop } from './tail.js';
+import { createBoss, BOSS } from './boss.js';
+import { createStorm, stormLevel } from './storm.js';
 
 const TOTAL = 10;
 const $ = (id) => document.getElementById(id);
@@ -35,7 +37,8 @@ scene.fog = new THREE.Fog(0xcfe3f2, 70, 260);
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 1200);
 
 // Blue World daytime: cool blue skylight from above, warm sand bounce from below, bright white-gold sun
-scene.add(new THREE.HemisphereLight(0xcfe4ff, 0xd9a877, 1.45));
+const hemi = new THREE.HemisphereLight(0xcfe4ff, 0xd9a877, 1.45);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff1dc, 2.7);
 sun.castShadow = true;
 sun.shadow.mapSize.set(LIGHT_MODE ? 1024 : 2048, LIGHT_MODE ? 1024 : 2048);
@@ -120,6 +123,10 @@ document.addEventListener('pointerlockchange', () => {
 let state = 'loading';
 let world, player, lizard, pebbles, dust, tarantulas, tail;
 let collected = 0;
+// Boss level only: the giant tarantula, the storm it brings, and bits of web
+let boss = null, storm = null, stuckTold = false, strands = null;
+const splats = [];
+const BOSS_WAIT = 'Wait until its fangs are stuck!';
 // Health: 3 hearts. A touch costs one; they refill slowly if you stay out of trouble.
 const MAX_HEARTS = 3, INVULN_TIME = 1.6, REGEN_DELAY = 8, REGEN_EVERY = 10;
 let hearts = MAX_HEARTS, invuln = 0, sinceHit = 99, regenT = 0;
@@ -170,6 +177,17 @@ async function init() {
     for (const c of world.colliders) if (c.top <= y + 0.05 && c.top > g && footprint(c, x, z).dist <= 0) g = c.top;
     return g;
   });
+  if (world.boss) {
+    boss = createBoss(scene, world.colliders, makeEnemy, world.boss);
+    storm = createStorm(scene, { sky: world.sky, fog: scene.fog, hemi, sun });
+    $('bossbar').classList.remove('hidden');
+    document.querySelector('.counter').classList.add('hidden');
+    document.body.classList.add('boss');
+    // web strands shown round the lizard while it is webbed
+    strands = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true }));
+    strands.position.y = 0.2; strands.scale.z = 1.7; strands.visible = false;
+    lizard.root.add(strands);
+  }
   reset();
   state = 'title';
   renderer.setAnimationLoop(loop);
@@ -196,6 +214,14 @@ function reset() {
   drawHearts();
   tarantulas?.reset();
   tail?.reset();
+  boss?.reset();
+  storm?.reset();
+  stuckTold = false;
+  drawBoss();
+}
+
+function drawBoss() {
+  if (boss) $('bossfill').style.width = `${(boss.health / boss.maxHealth) * 100}%`;
 }
 
 function drawHearts() {
@@ -257,7 +283,7 @@ function goToLevel(id, autostart) {
 // Title screen: this level's name, story and picture, plus a picker for unlocked levels.
 function setupTitle() {
   document.title = LEVEL_ID === 1 ? 'Blue World' : `Blue World · ${LEVEL.name}`;
-  $('level-name').textContent = `Level ${LEVEL_ID} · ${LEVEL.name}`;
+  $('level-name').textContent = LEVEL.boss ? `Boss · ${LEVEL.name}` : `Level ${LEVEL_ID} · ${LEVEL.name}`;
   $('level-intro').textContent = LEVEL.intro;
   $('hint').textContent = LEVEL.hint;
   $('help').textContent = LEVEL.help;
@@ -267,7 +293,7 @@ function setupTitle() {
   $('levels').innerHTML = LEVELS.map((l) => {
     const locked = l.id > open, here = l.id === LEVEL_ID;
     return `<button class="lvl${here ? ' here' : ''}" data-id="${l.id}" ${locked ? 'disabled' : ''}>`
-      + `${locked ? '🔒' : l.id} <span>${l.name}</span></button>`;
+      + `${locked ? '🔒' : l.boss ? '🕷' : l.id} <span>${l.name}</span></button>`;
   }).join('');
   $('levels').querySelectorAll('button:not([disabled])').forEach((b) => {
     b.onclick = () => { if (Number(b.dataset.id) !== LEVEL_ID) goToLevel(Number(b.dataset.id), false); };
@@ -282,6 +308,54 @@ function toast(msg) {
   t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+// ---------- Boss fight (boss level only) ----------
+const splatGeo = new THREE.CircleGeometry(0.9, 9).rotateX(-Math.PI / 2);
+function bossFrame(dt, playing) {
+  const ev = boss.update(dt, player, playing && invuln <= 0);
+  const bounce = () => { player.velY = 9; player.onGround = false; };
+  if (ev.caught) getHurt(ev.caught);
+  if (ev.webbed) { player.webbed = BOSS.WEB_TIME; toast('Webbed!'); sfx.webbed(); }
+  if (ev.hit) {
+    bounce(); sfx.bossHit(); drawBoss();
+    dust.puff(boss.pos, 14, 2);
+    storm.set(stormLevel(boss.health, boss.maxHealth));
+    if (!ev.defeated) toast('Got it!');
+  }
+  if (ev.bounced) { bounce(); sfx.jump(); toast(BOSS_WAIT); }
+  if (ev.stuckNow) {
+    sfx.stuck();
+    if (!stuckTold) { stuckTold = true; toast('Its fangs are stuck! Jump on its back!'); }
+  }
+  if (ev.windupNow === 'lunge') sfx.hiss();
+  if (ev.shotNow) sfx.web();
+  if (ev.splat) {
+    const m = new THREE.Mesh(splatGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false }));
+    m.position.copy(ev.splat); m.position.y += 0.04;
+    scene.add(m); splats.push({ m, life: 4 });
+  }
+  if (ev.defeated && state === 'play') {
+    state = 'win';
+    storm.set(0); // the sky clears
+    toast('You did it!');
+    dust.puff(boss.pos, 30, 3);
+    setTimeout(() => sfx.win(), 1500);
+    setTimeout(() => {
+      document.exitPointerLock?.();
+      $('win-title').textContent = 'You beat the Giant Tarantula!';
+      $('win-msg').textContent = 'Blue World is safe again. Do a victory push-up!';
+      $('next').classList.add('hidden');
+      $('win').classList.remove('hidden');
+    }, 3000);
+  }
+  for (let i = splats.length - 1; i >= 0; i--) {
+    const s = splats[i];
+    s.life -= dt; s.m.material.opacity = Math.min(1, s.life) * 0.85;
+    if (s.life <= 0) { scene.remove(s.m); s.m.material.dispose(); splats.splice(i, 1); }
+  }
+  strands.visible = player.webbed > 0;
+  if (storm.update(dt, camYaw + Math.PI).bolt && state !== 'title') sfx.thunder();
 }
 
 // ---------- Loop ----------
@@ -340,6 +414,7 @@ function frame(dt) {
     const bit = tarantulas.bite(player.pos, player.yaw);
     if (bit.defeated > 0) { sfx.stomp(); toast('Chomp!'); }
     else if (bit.shrugged > 0) toast(KITTEN_HINT);
+    else if (boss && boss.state !== 'defeated' && Math.hypot(boss.pos.x - player.pos.x, boss.pos.z - player.pos.z) < BOSS.BODY_R + 1.5) toast(BOSS_WAIT);
   }
   bitePressed = false;
 
@@ -347,6 +422,7 @@ function frame(dt) {
   // (it comes off where the tail was: a little behind the body)
   if (playing && tailPressed && tail.drop(player.climbing ? player.pos : player.behind(0.6), player.yaw)) {
     tarantulas.distract(tail.pos);
+    boss?.baitWith(tail.pos);
     sfx.tail(); toast('Dropped your tail!');
   }
   tailPressed = false;
@@ -373,6 +449,7 @@ function frame(dt) {
   } else if (spiderHit.result === 'hurt') {
     getHurt(spiderHit.from);
   }
+  if (boss) bossFrame(dt, playing);
   invuln = Math.max(0, invuln - dt);
   sinceHit += dt;
   if (playing && hearts < MAX_HEARTS && sinceHit > REGEN_DELAY) {
@@ -429,7 +506,9 @@ function frame(dt) {
         const hasNext = LEVEL_ID < LEVELS.length;
         if (hasNext) unlockLevel(LEVEL_ID + 1);
         $('next').classList.toggle('hidden', !hasNext);
-        $('win-msg').textContent = hasNext ? `Level ${LEVEL_ID + 1} · ${LEVELS[LEVEL_ID].name} is unlocked!` : 'You finished every level. Do a victory push-up!';
+        $('win-msg').textContent = !hasNext ? 'You finished every level. Do a victory push-up!'
+          : LEVELS[LEVEL_ID].boss ? `The boss is unlocked: ${LEVELS[LEVEL_ID].name}!`
+            : `Level ${LEVEL_ID + 1} · ${LEVELS[LEVEL_ID].name} is unlocked!`;
         $('win').classList.remove('hidden');
       }, 1200);
     }
@@ -479,4 +558,4 @@ function frame(dt) {
 
 init();
 // handy for debugging / testing in the console
-window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, start, frame };
+window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, get boss() { return boss; }, get storm() { return storm; }, start, frame };

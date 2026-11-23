@@ -52,7 +52,7 @@ export async function build(scene) {
   for (let i = 0; i < N; i++) {
     const a = (i / N) * Math.PI * 2 + 0.1;
     const x = Math.sin(a) * RING, z = Math.cos(a) * RING;
-    const r = 9.2 + rand() * 1.6, h = 15 + rand() * 9;
+    const r = 9.2 + rand() * 1.6, h = 6 + rand() * 4; // low enough to leave plenty of sky for the storm
     const base = terrainHeight(x, z) - 2, H = h + 2;
     const wob = wobble(i * 1.9, 0.06);
     const rAt = (_y, ang) => r * wob(ang);
@@ -82,6 +82,8 @@ export async function build(scene) {
     if (i % 3 === 2) {
       const bush = add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.7, 0), bushMat));
       bush.position.set(x, y + 0.45, z); bush.scale.y = 0.7;
+      solids.push(bush);
+      colliders.push({ type: 'circle', x, z, r: 0.65, bottom: -100, top: y + 0.95, climbable: false });
       continue;
     }
     const h = 3 + rand() * 2.5;
