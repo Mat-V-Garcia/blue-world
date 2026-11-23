@@ -37,7 +37,7 @@ export const LEVELS = [
     boss: true, // won by beating the boss, not by collecting pebbles
     name: 'The Giant Tarantula',
     intro: 'Something huge is stirring under the dunes. The giant tarantula has woken up, and only one small lizard can send it back!',
-    title: '/assets/title.jpg',
+    title: '/assets/title-boss.jpg',
     hint: 'Dodge its lunge · Jump on its back while its fangs are stuck · Q drop tail to trick it · Hide from webs behind rocks',
     help: 'Dodge the lunge, then jump on its back while its fangs are stuck in the sand · Q drops your tail to trick it · Rocks block its webs',
     helpTouch: 'Dodge the lunge, then Jump onto its back while its fangs are stuck · Tail tricks it · Rocks block its webs',
