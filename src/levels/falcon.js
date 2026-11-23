@@ -26,9 +26,9 @@ export async function build(scene) {
   return {
     ...shops,
     pebbleSpots: PEBBLES.map((p) => ({ x: p.x, z: p.z, y: groundHeight(p.x, p.z) + p.up, hint: p.hint })),
-    enemies: { kind: 'pigeon', count: 0 }, // the pigeons have all fled (the falcon borrows their model)
+    enemies: { kind: 'falcon', count: 0 }, // the pigeons have all fled; this picks the boss's model
     boss: {
-      kind: 'falcon', perch: PERCH, health: 6, scale: 2, yaw: Math.PI * 0.75,
+      kind: 'falcon', perch: PERCH, health: 6, scale: 1, yaw: Math.PI * 0.75,
       text: {
         name: 'Peregrine Falcon',
         wake: 'A shadow passes overhead…',

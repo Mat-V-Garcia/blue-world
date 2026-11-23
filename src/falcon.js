@@ -16,20 +16,13 @@ export const FALCON = {
   TAIL_RANGE: 25, ANGRY_BELOW: 0.5, ANGRY: 0.7, // angry: circling and hovering take 0.7 as long
 };
 
-// makeModel(): { root, update(dt, speed, mode) } (the pigeon model, or the simple stand-in).
-// cfg: { perch: {x, y, z}, health?, scale?, tint? }  It sits on its perch until emerge().
+// makeModel(): { root, update(dt, speed, mode) } (the falcon model, or the simple stand-in).
+// cfg: { perch: {x, y, z}, health?, scale?, yaw? }  It sits on its perch until emerge().
 export function createFalcon(scene, colliders, makeModel, cfg = {}) {
   const B = FALCON;
   const v = makeModel();
   const rig = new THREE.Group(), tilt = new THREE.Group();
-  v.root.scale.setScalar(cfg.scale ?? 2);
-  // the stand-in is a pigeon: darken it to a peregrine's slate blue-grey
-  const tint = new THREE.Color(cfg.tint ?? 0xb4c0dc);
-  v.root.traverse((o) => {
-    if (!o.isMesh || !o.material) return;
-    const paint = (m) => { const c = m.clone(); c.color?.multiply(tint); return c; };
-    o.material = Array.isArray(o.material) ? o.material.map(paint) : paint(o.material);
-  });
+  v.root.scale.setScalar(cfg.scale ?? 1);
   tilt.add(v.root); rig.add(tilt); scene.add(rig);
 
   // its shadow on the ground, and the ring that shows where a dive will land

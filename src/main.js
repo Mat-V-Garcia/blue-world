@@ -5,6 +5,7 @@ import { loadKittenModel, createSimpleKitten } from './kittenModel.js';
 import { loadPigeonModel, createSimplePigeon } from './pigeonModel.js';
 import { createLizard } from './lizard.js';
 import { createLizardModel } from './lizardModel.js';
+import { loadFalconModel, createSimpleFalcon } from './falconModel.js';
 import { createTarantulas, createSimpleSpider } from './enemies.js';
 import { loadSpiderModel } from './spiderModel.js';
 import { createTouchControls, isTouchDevice } from './touch.js';
@@ -146,6 +147,7 @@ const ENEMY_MODELS = {
   tarantula: [loadSpiderModel, createSimpleSpider],
   pigeon: [loadPigeonModel, createSimplePigeon],
   kitten: [loadKittenModel, createSimpleKitten],
+  falcon: [loadFalconModel, createSimpleFalcon], // the boss at the shops (no small ones)
 };
 
 async function init() {
@@ -581,4 +583,4 @@ function frame(dt) {
 
 init();
 // handy for debugging / testing in the console
-window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, get boss() { return boss; }, get storm() { return storm; }, start, frame };
+window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = v; }, set camPitch(v) { camPitch = v; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, get boss() { return boss; }, get storm() { return storm; }, start, frame };
