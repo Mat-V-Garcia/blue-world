@@ -197,3 +197,35 @@ test('a web is stopped by the wide base of a boulder, not just its narrow top', 
 test('tuning: a little harder than the first version', () => {
   assert.deepEqual([BOSS.WALK, BOSS.LUNGE_SPEED, BOSS.WEB_COOLDOWN], [3.5, 20, 2.5]);
 });
+
+// ---- the boss only arrives once the pebbles are collected ----
+const makeHidden = () => { setGround({ height: () => 0, radius: 40 }); return createBoss(scene, [], model, { x: 0, z: 0, hidden: true }); };
+const quiet = (e) => !e.caught && !e.hit && !e.bounced && !e.windupNow && !e.shotNow && !e.webbed && !e.stuckNow;
+
+test('a hidden boss does nothing, even with the lizard standing on its spot', () => {
+  const b = makeHidden(), p = liz(0, 0, 0.5, -3);
+  assert.equal(b.state, 'hidden');
+  for (let i = 0; i < 600; i++) assert.ok(quiet(b.update(1 / 60, p, true)));
+  assert.equal(b.state, 'hidden');
+  assert.deepEqual([b.pos.x, b.pos.z], [0, 0]);
+  assert.equal(b.baitWith(new THREE.Vector3(3, 0, 0)), false);
+});
+
+test('emerge(): it climbs out harmlessly for 1.5 s, then the fight starts', () => {
+  const b = makeHidden(), p = liz(0, 1);
+  assert.equal(b.emerge(), true);
+  assert.equal(b.state, 'emerge');
+  for (let i = 0; i < 1.4 * 60; i++) assert.ok(quiet(b.update(1 / 60, p, true)));
+  assert.equal(b.state, 'emerge');
+  until(b, p, (_e, bb) => bb.state !== 'emerge', 0.3);
+  until(b, p, (e) => e.caught || e.windupNow, 5);
+  assert.equal(b.emerge(), false); // only once
+});
+
+test('reset hides it again; a boss made without `hidden` starts out fighting as before', () => {
+  const b = makeHidden();
+  b.emerge();
+  b.reset();
+  assert.equal(b.state, 'hidden');
+  assert.equal(make().state, 'approach');
+});

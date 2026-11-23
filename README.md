@@ -10,7 +10,7 @@ A cosy 3D browser game: you're a western fence lizard collecting 10 golden pebbl
   playhouse and swing set, a lemon tree, a shed and a white fence. Enemies: alley kittens, which can't be
   beaten, only scared off or fooled.
 
-- **Boss · The Giant Tarantula** — a walled desert arena. One giant tarantula lunges with its fangs and shoots webs; the sky turns to a red lightning storm as its health drops. Unlocked by winning Level 3.
+- **Boss · The Giant Tarantula** — a walled desert arena with ten golden pebbles. Picking up the tenth wakes the giant tarantula, which bursts out of the sand. It lunges with its fangs and shoots webs; the sky turns to a red lightning storm as its health drops. Unlocked by winning Level 3.
 
 Finishing a level unlocks the next (saved in the browser). The title screen has a level picker.
 

@@ -17,10 +17,11 @@ export const BOSS = {
 const REST = 0.6;        // stands still this long after pulling free or catching the lizard
 const SHORT_LUNGE = 1.5; // a lunge stopped by a rock sooner than this isn't a real miss
 const WALK_ROUND = 3;    // ...and after one it walks round the rock this long before lunging again
+const EMERGE = 1.5;      // seconds it takes to climb out of the sand (harmless meanwhile)
 const SNAP = 2.6;        // how far past its body the fangs reach when a rock or the wall stops a lunge
 
 // makeModel(): { root, update(dt, speed) } (the tarantula model or the simple stand-in).
-// cfg: { x, z, health?, scale? }
+// cfg: { x, z, health?, scale?, hidden? }  hidden: it waits under the sand until emerge()
 export function createBoss(scene, colliders, makeModel, cfg = {}) {
   const B = BOSS, SCALE = cfg.scale ?? 5;
   const v = makeModel();
@@ -100,20 +101,28 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
 
   function reset() {
     boss.pos.set(sx, terrainHeight(sx, sz), sz);
-    boss.yaw = 0; boss.health = boss.maxHealth; boss.state = 'approach';
+    boss.yaw = 0; boss.health = boss.maxHealth; boss.state = cfg.hidden ? 'hidden' : 'approach';
     timer = 0; rest = 0; speed = 0; pendingWindup = null;
     webCD = 1; perch = 0; shots = 0; followUp = false; noLunge = 0;
     clearWebs();
     pose = { rx: 0, sy: 1, y: 0 };
-    rig.visible = true;
+    rig.visible = !cfg.hidden;
   }
   reset();
 
   boss.reset = reset;
+  // Burst out of the sand and start the fight. False if it is already out.
+  boss.emerge = () => {
+    if (boss.state !== 'hidden') return false;
+    boss.state = 'emerge'; timer = EMERGE;
+    pose = { rx: -0.3, sy: 1, y: -B.BACK_UP * 1.4 };
+    rig.visible = true;
+    return true;
+  };
   // A dropped tail: lunge at it instead (and get stuck there). False if it took no notice.
   boss.baitWith = (pos) => {
     const s = boss.state;
-    if (s === 'lunge' || s === 'stuck' || s === 'recover' || s === 'defeated') return false;
+    if (s === 'lunge' || s === 'stuck' || s === 'recover' || s === 'defeated' || s === 'hidden' || s === 'emerge') return false;
     if (Math.hypot(pos.x - boss.pos.x, pos.z - boss.pos.z) > B.TAIL_RANGE) return false;
     followUp = false; rest = 0;
     startWindup(pos.x, pos.z);
@@ -121,6 +130,7 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
   };
   boss.update = (dt, player, canHurt) => {
     const ev = { caught: null, hit: false, bounced: false, defeated: false, stuckNow: false, windupNow: null, shotNow: false, webbed: false, splat: null };
+    if (boss.state === 'hidden') return ev;
     const px = player.pos.x, pz = player.pos.z;
     const dist = Math.hypot(px - boss.pos.x, pz - boss.pos.z);
     speed = 0;
@@ -178,6 +188,10 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
         boss.pos.x = nx; boss.pos.z = nz; travelled += step;
         if (travelled >= lungeLen - 1e-6) stick(ev);
       }
+    } else if (boss.state === 'emerge') {
+      face(px, pz, dt);
+      timer -= dt;
+      if (timer <= 0) { boss.state = 'approach'; rest = REST; webCD = 1; }
     } else if (boss.state === 'stuck' || boss.state === 'recover') {
       timer -= dt;
       if (timer <= 0) { rest = boss.state === 'stuck' ? REST : 0; boss.state = 'approach'; }
@@ -205,7 +219,7 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
     const dh = Math.hypot(px - boss.pos.x, pz - boss.pos.z);
     const up = player.pos.y - boss.pos.y;
     const st = boss.state;
-    if (dh < B.BODY_R && st !== 'defeated' && st !== 'recover' && !ev.caught) {
+    if (dh < B.BODY_R && st !== 'defeated' && st !== 'recover' && st !== 'emerge' && !ev.caught) {
       if (st === 'stuck') {
         if (player.velY < 0 && up >= 0.4 && up <= B.BACK_STUCK + 1 && !ev.stuckNow) {
           ev.hit = true;
@@ -232,7 +246,7 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
         : s === 'webwind' ? { rx: 0.3, sy: 1, y: 0.2 }
           : s === 'defeated' ? { rx: 0, sy: 0.3, y: -B.BACK_UP * 1.4 }
           : { rx: 0, sy: 1, y: 0 };
-    const k = Math.min(1, dt * (s === 'defeated' ? 0.8 : 9));
+    const k = Math.min(1, dt * (s === 'defeated' ? 0.8 : s === 'emerge' ? 2.5 : 9));
     pose.rx += (want.rx - pose.rx) * k; pose.sy += (want.sy - pose.sy) * k; pose.y += (want.y - pose.y) * k;
     if (s === 'defeated') { timer += dt; if (timer > 3) rig.visible = false; }
     rig.position.copy(boss.pos); rig.position.y += pose.y;

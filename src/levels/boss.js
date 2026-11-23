@@ -20,6 +20,21 @@ export const BOULDERS = [
   { x: 10, z: 20, r: 2.3, h: 2.4 }, { x: 24, z: 6, r: 1.9, h: 2.0 },
 ];
 
+// The ten golden pebbles. Only when the last one is picked up does the tarantula come out.
+// up: how far above the sand it sits (the ones on boulders match the boulder heights).
+export const PEBBLES = [
+  { x: 0, z: -22, up: 0, hint: 'An easy one!' },
+  { x: 14, z: -8, up: 2.3, hint: 'On a boulder' },
+  { x: -16, z: -6, up: 2.5, hint: 'Tallest boulder' },
+  { x: -28, z: -18, up: 0, hint: 'By the wall' },
+  { x: -30, z: 10, up: 0, hint: 'Out west' },
+  { x: -12, z: 16, up: 2.1, hint: 'Boulder hop' },
+  { x: 10, z: 20, up: 2.4, hint: 'Up top' },
+  { x: 0, z: 32, up: 0, hint: 'The far side' },
+  { x: 30, z: -14, up: 0, hint: 'Near the cactus' },
+  { x: 24, z: 6, up: 2.0, hint: 'Smallest boulder' },
+];
+
 function buildTerrain(sandTex) {
   const size = 200, seg = 120;
   const geo = new THREE.PlaneGeometry(size, size, seg, seg);
@@ -98,10 +113,11 @@ export async function build(scene) {
     solids,
     horizonColor,
     sky,                                     // handles the storm recolours
-    pebbleSpots: [],                         // nothing to collect: the level is won by beating the boss
+    // collecting all ten wakes the boss; the level is won by beating it
+    pebbleSpots: PEBBLES.map((p) => ({ x: p.x, z: p.z, y: terrainHeight(p.x, p.z) + p.up + 0.6, hint: p.hint })),
     spawn: { x: 0, z: -32, yaw: 0 },
     enemies: { kind: 'tarantula', count: 0 }, // no small ones (a level that says nothing gets six)
-    boss: { x: 0, z: 0, health: 6, scale: 5 },
+    boss: { x: 0, z: 0, health: 6, scale: 5, hidden: true }, // under the sand until the tenth pebble
     update() {},
   };
 }

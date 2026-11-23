@@ -180,8 +180,6 @@ async function init() {
   if (world.boss) {
     boss = createBoss(scene, world.colliders, makeEnemy, world.boss);
     storm = createStorm(scene, { sky: world.sky, fog: scene.fog, hemi, sun });
-    $('bossbar').classList.remove('hidden');
-    document.querySelector('.counter').classList.add('hidden');
     document.body.classList.add('boss');
     // web strands shown round the lizard while it is webbed
     strands = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true }));
@@ -221,7 +219,12 @@ function reset() {
 }
 
 function drawBoss() {
-  if (boss) $('bossfill').style.width = `${(boss.health / boss.maxHealth) * 100}%`;
+  if (!boss) return;
+  $('bossfill').style.width = `${(boss.health / boss.maxHealth) * 100}%`;
+  // while it sleeps under the sand the pebble counter shows; once it is out, its health bar
+  const out = boss.state !== 'hidden';
+  $('bossbar').classList.toggle('hidden', !out);
+  document.querySelector('.counter').classList.toggle('hidden', out);
 }
 
 function drawHearts() {
@@ -498,8 +501,15 @@ function frame(dt) {
     c.classList.add('bump');
     setTimeout(() => c.classList.remove('bump'), 150);
     sfx.pickup(collected);
-    toast(collected === TOTAL ? 'All the pebbles!' : `+1 · ${got.hint}`);
-    if (collected === TOTAL) {
+    toast(collected === TOTAL ? (boss ? 'The ground is shaking…' : 'All the pebbles!') : `+1 · ${got.hint}`);
+    if (collected === TOTAL && boss) {
+      // boss level: the last pebble wakes the giant tarantula
+      if (boss.emerge()) {
+        drawBoss();
+        dust.puff(boss.pos, 40, 3.5);
+        sfx.thunder(); sfx.hiss();
+      }
+    } else if (collected === TOTAL) {
       state = 'win';
       sfx.win();
       setTimeout(() => {

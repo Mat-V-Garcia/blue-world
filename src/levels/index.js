@@ -34,13 +34,13 @@ export const LEVELS = [
   },
   {
     id: 4,
-    boss: true, // won by beating the boss, not by collecting pebbles
+    boss: true, // collecting the pebbles wakes the boss; the level is won by beating it
     name: 'The Giant Tarantula',
-    intro: 'Something huge is stirring under the dunes. The giant tarantula has woken up, and only one small lizard can send it back!',
+    intro: 'Ten golden pebbles lie in a quiet desert arena. But something huge is sleeping under the sand, and the last pebble will wake it. Only one small lizard can send it back!',
     title: '/assets/title-boss.jpg',
-    hint: 'Dodge its lunge · Jump on its back while its fangs are stuck · Q drop tail to trick it · Hide from webs behind rocks',
-    help: 'Dodge the lunge, then jump on its back while its fangs are stuck in the sand · Q drops your tail to trick it · Rocks block its webs',
-    helpTouch: 'Dodge the lunge, then Jump onto its back while its fangs are stuck · Tail tricks it · Rocks block its webs',
+    hint: 'Collect the 10 pebbles to wake the boss · Dodge its lunge · Jump on its back while its fangs are stuck · Q drop tail to trick it',
+    help: 'Collect all ten pebbles and the giant tarantula comes out · Dodge its lunge, then jump on its back while its fangs are stuck · Q drops your tail to trick it · Rocks block its webs',
+    helpTouch: 'Collect all ten pebbles and the giant tarantula comes out · Dodge its lunge, then Jump onto its back while its fangs are stuck · Tail tricks it',
     load: () => import('./boss.js'),
   },
 ];
