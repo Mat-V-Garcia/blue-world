@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { terrainHeight, footprint } from './world.js';
-import { LEVELS, currentLevelId, unlockedLevel, unlockLevel, migrateUnlocks } from './levels/index.js';
+import { LEVELS, levelLabel, currentLevelId, unlockedLevel, unlockLevel, migrateUnlocks } from './levels/index.js';
 import { loadKittenModel, createSimpleKitten } from './kittenModel.js';
 import { loadPigeonModel, createSimplePigeon } from './pigeonModel.js';
 import { createLizard } from './lizard.js';
@@ -286,7 +286,7 @@ function goToLevel(id, autostart) {
 // Title screen: this level's name, story and picture, plus a picker for unlocked levels.
 function setupTitle() {
   document.title = LEVEL_ID === 1 ? 'Blue World' : `Blue World · ${LEVEL.name}`;
-  $('level-name').textContent = LEVEL.boss ? `Boss · ${LEVEL.name}` : `Level ${LEVEL_ID} · ${LEVEL.name}`;
+  $('level-name').textContent = `${levelLabel(LEVEL)} · ${LEVEL.name}`;
   $('level-intro').textContent = LEVEL.intro;
   $('hint').textContent = LEVEL.hint;
   $('help').textContent = LEVEL.help;
@@ -296,7 +296,7 @@ function setupTitle() {
   $('levels').innerHTML = LEVELS.map((l) => {
     const locked = l.id > open, here = l.id === LEVEL_ID;
     return `<button class="lvl${here ? ' here' : ''}" data-id="${l.id}" ${locked ? 'disabled' : ''}>`
-      + `${locked ? '🔒' : l.boss ? '🕷' : l.id} <span>${l.name}</span></button>`;
+      + `${locked ? '🔒' : l.boss ? '🕷' : levelLabel(l).slice(6)} <span>${l.name}</span></button>`;
   }).join('');
   $('levels').querySelectorAll('button:not([disabled])').forEach((b) => {
     b.onclick = () => { if (Number(b.dataset.id) !== LEVEL_ID) goToLevel(Number(b.dataset.id), false); };
@@ -348,8 +348,10 @@ function bossFrame(dt, playing) {
     setTimeout(() => {
       document.exitPointerLock?.();
       $('win-title').textContent = 'You beat the Giant Tarantula!';
-      $('win-msg').textContent = 'Blue World is safe again. Do a victory push-up!';
-      $('next').classList.add('hidden');
+      const next = LEVELS[LEVEL_ID]; // the level after the boss, if there is one
+      if (next) unlockLevel(next.id);
+      $('win-msg').textContent = next ? `The desert is safe again. ${levelLabel(next)} · ${next.name} is unlocked!` : 'Blue World is safe again. Do a victory push-up!';
+      $('next').classList.toggle('hidden', !next);
       $('win').classList.remove('hidden');
     }, 3000);
   }
@@ -519,7 +521,7 @@ function frame(dt) {
         $('next').classList.toggle('hidden', !hasNext);
         $('win-msg').textContent = !hasNext ? 'You finished every level. Do a victory push-up!'
           : LEVELS[LEVEL_ID].boss ? `The boss is unlocked: ${LEVELS[LEVEL_ID].name}!`
-            : `Level ${LEVEL_ID + 1} · ${LEVELS[LEVEL_ID].name} is unlocked!`;
+            : `${levelLabel(LEVELS[LEVEL_ID])} · ${LEVELS[LEVEL_ID].name} is unlocked!`;
         $('win').classList.remove('hidden');
       }, 1200);
     }

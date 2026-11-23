@@ -3,14 +3,13 @@
 A cosy 3D browser game: you're a western fence lizard collecting 10 golden pebbles per level.
 
 - **Level 1 · The Desert** — dunes, mesas, cacti, fences and an old wagon. Enemies: tarantulas.
+- **Boss · The Giant Tarantula** — a walled desert arena with ten golden pebbles. Picking up the tenth wakes the giant tarantula, which bursts out of the sand. It lunges with its fangs and shoots webs; the sky turns to a red lightning storm as its health drops. It comes straight after Level 1 and unlocks Level 2 when beaten.
 - **Level 2 · Fullerton Shops** — a sunny Southern California shopping center inspired by Fullerton, CA
   (all shop names are made up): storefronts, a clock tower, a fountain, palms, an orange tree, cafés,
   carts and a parking lot. Enemies: pigeons.
 - **Level 3 · The Back Yard** — a sunny family back yard: striped patio and gazebo, lawn with a
   playhouse and swing set, a lemon tree, a shed and a white fence. Enemies: alley kittens, which can't be
   beaten, only scared off or fooled.
-
-- **Boss · The Giant Tarantula** — a walled desert arena with ten golden pebbles. Picking up the tenth wakes the giant tarantula, which bursts out of the sand. It lunges with its fangs and shoots webs; the sky turns to a red lightning storm as its health drops. Unlocked by winning Level 3.
 
 Finishing a level unlocks the next (saved in the browser). The title screen has a level picker.
 

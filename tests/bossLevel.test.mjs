@@ -17,9 +17,9 @@ test('boulders are low cover, clear of the middle and of the start', () => {
     assert.ok(Math.hypot(b.x, b.z + 32) >= 8);
   }
 });
-test('the boss is the fourth and last level', () => {
+test('the boss is the second of four levels', () => {
   assert.equal(LEVELS.length, 4);
-  assert.equal(LEVELS[3].boss, true);
+  assert.equal(LEVELS[1].boss, true);
   assert.equal(LEVELS.filter((l) => l.boss).length, 1);
 });
 

@@ -7,10 +7,10 @@ const store = (init) => {
   return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), m };
 };
 
-test('Level 2 players get Level 3, once', () => {
+test('players from before the Back Yard existed (Shops open) get the Back Yard, once', () => {
   const s = store({ 'blueworld.unlocked': '2' });
   migrateUnlocks(s);
-  assert.equal(s.m.get('blueworld.unlocked'), '3');
+  assert.equal(s.m.get('blueworld.unlocked'), '4'); // the Back Yard is now id 4
   assert.ok(s.m.get('blueworld.l3open'));
 });
 
@@ -22,7 +22,7 @@ test('new players are not unlocked', () => {
 });
 
 test('does not run twice', () => {
-  const s = store({ 'blueworld.unlocked': '2', 'blueworld.l3open': '1' });
+  const s = store({ 'blueworld.unlocked': '2', 'blueworld.l3open': '1', 'blueworld.bossSecond': '1' });
   migrateUnlocks(s);
   assert.equal(s.m.get('blueworld.unlocked'), '2');
 });
@@ -30,7 +30,7 @@ test('does not run twice', () => {
 test('never lowers progress', () => {
   const s = store({ 'blueworld.unlocked': '3' });
   migrateUnlocks(s);
-  assert.equal(s.m.get('blueworld.unlocked'), '3');
+  assert.ok(Number(s.m.get('blueworld.unlocked')) >= 3);
 });
 
 test('storage that throws is survived', () => {
@@ -54,8 +54,26 @@ test('asking for the boss by address falls back to Level 3 until it is unlocked'
   assert.equal(await withBrowser(4, '?level=4', (m) => m.currentLevelId()), 4);
 });
 
-test('nobody gets the boss unlocked automatically', () => {
-  const s = store({ 'blueworld.unlocked': '3' });
+// The boss moved from last to second (Desert, Boss, Shops, Back Yard). Saved progress is
+// the highest level id open, so old saves shift up by one to keep the same levels open.
+import { LEVELS, levelLabel } from '../src/levels/index.js';
+
+test('level order: the boss comes straight after the desert', () => {
+  assert.deepEqual(LEVELS.map((l) => l.name), ['The Desert', 'The Giant Tarantula', 'Fullerton Shops', 'The Back Yard']);
+  assert.deepEqual(LEVELS.map((l) => l.id), [1, 2, 3, 4]);
+  assert.deepEqual(LEVELS.map(levelLabel), ['Level 1', 'Boss', 'Level 2', 'Level 3']);
+});
+
+test('old saves keep the levels they had open after the re-order, once', () => {
+  const after = (n) => { const s = store({ 'blueworld.unlocked': String(n), 'blueworld.l3open': '1' }); migrateUnlocks(s); migrateUnlocks(s); return s.m.get('blueworld.unlocked'); };
+  assert.equal(after(1), '1'); // only the desert: the boss still has to be earned
+  assert.equal(after(2), '3'); // had the Shops
+  assert.equal(after(3), '4'); // had the Back Yard
+  assert.equal(after(4), '4'); // had everything
+});
+
+test('a brand-new player starts with only the desert', () => {
+  const s = store({});
   migrateUnlocks(s);
-  assert.equal(s.m.get('blueworld.unlocked'), '3');
+  assert.equal(s.m.has('blueworld.unlocked'), false);
 });
