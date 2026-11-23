@@ -27,7 +27,7 @@ Tarantulas wander the desert and chase you if you get close. Jump on them or bit
 
 **Drop your tail (Q)** on any level: it stays behind wriggling for a few seconds and nearby enemies go for it instead of you. It grows back after about 30 seconds (the HUD shows "Tail ready").
 
-**The boss** can only be hurt one way: dodge its lunge so its fangs stick in the sand, then jump onto its back (6 hits). Dropping your tail makes it lunge at the tail instead. A web that hits slows you and stops you jumping for a couple of seconds; boulders block webs. Bites and push-ups do nothing to it. Losing all your hearts sends you back to the start but the boss keeps its damage.
+**The boss** can only be hurt one way: dodge its lunge so its fangs stick in the sand, then jump onto its back (6 hits). Dropping your tail makes it lunge at the tail instead. A web that hits slows you and stops you jumping for a couple of seconds; boulders block webs. Bites and push-ups do nothing to it. Losing all your hearts starts the boss level over: the pebbles come back and the boss is asleep again with full health.
 
 **Kittens (Level 3)** are different: jumping on them or biting them does nothing. Do push-ups (E) for a moment while one is close and it bolts home for a while, or drop your tail, or get somewhere they can't follow (up high, or under the bench, table, chairs or playhouse).
 

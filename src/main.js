@@ -243,10 +243,17 @@ function getHurt(from) {
   h.classList.add('shake');
   setTimeout(() => h.classList.remove('shake'), 400);
   if (hearts <= 0) {
-    // out of hearts: back to the start, pebbles kept
-    toast('Ouch! Back to the start');
+    // out of hearts: back to the start, pebbles kept. On the boss level the whole level
+    // starts over instead: pebbles back, boss asleep under the sand with full health.
+    toast(boss ? 'Ouch! Starting the level again' : 'Ouch! Back to the start');
     $('flash').classList.add('show');
     setTimeout(() => {
+      if (boss) {
+        reset();
+        invuln = 2.5;
+        $('flash').classList.remove('show');
+        return;
+      }
       player.respawn();
       camYaw = player.yaw + Math.PI; moveBasisYaw = camYaw;
       camTarget.copy(player.pos);
