@@ -141,9 +141,9 @@ export async function loadKittenModel(url = '/assets/kitten.glb') {
     }
   });
 
-  return function makeKitten() {
+  return function makeKitten(coat) { // coat (optional): a fur tint, for the big cat boss
     const model = cloneSkinned(source);
-    const tint = new THREE.Color(TINTS[nextTint++ % TINTS.length]);
+    const tint = new THREE.Color(coat ?? TINTS[nextTint++ % TINTS.length]);
     model.traverse((o) => {
       if (!o.isMesh || !o.material) return;
       const m = o.material = o.material.clone();

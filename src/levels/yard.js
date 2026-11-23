@@ -57,7 +57,8 @@ export async function build(scene) {
     if (upright) { map.center.set(0.5, 0.5); map.rotation = Math.PI / 2; }
     return toon(color, { map });
   };
-  const horizonColor = await buildSky(scene, skyTex);
+  const sky = {}; // handles for the cat boss's sunset (this level ignores them)
+  const horizonColor = await buildSky(scene, skyTex, sky);
   const rand = rng(23);
   const colliders = [], solids = [];
   const add = (m, solid = true) => { m.traverse?.((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } }); scene.add(m); if (solid) solids.push(m); return m; };
@@ -466,6 +467,7 @@ export async function build(scene) {
     colliders,
     solids,
     horizonColor,
+    sky,
     pebbleSpots,
     spawn: { x: -2.5, z: -42, yaw: 0 }, // on the path, looking up the yard to the porch
     enemies: {

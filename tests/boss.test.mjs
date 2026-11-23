@@ -229,3 +229,32 @@ test('reset hides it again; a boss made without `hidden` starts out fighting as 
   assert.equal(b.state, 'hidden');
   assert.equal(make().state, 'approach');
 });
+
+// ---- the same rules as the big cat (tuned numbers, drops in, sleeps when beaten) ----
+const cat = () => { setGround({ height: () => 0, radius: 40 }); return createBoss(scene, [], model, { x: 0, z: 0, hidden: true, emergeFrom: 9, sleeps: true, tune: { WALK: 4, BODY_R: 2.0, BACK_UP: 2.6, WEB_TIME: 2 } }); };
+test('cat: tuned numbers are used and reported; the tarantula keeps its own', () => {
+  const b = cat();
+  assert.equal(b.bodyR, 2.0); assert.equal(b.webTime, 2);
+  assert.equal(make().bodyR, BOSS.BODY_R); assert.equal(make().webTime, BOSS.WEB_TIME);
+  b.emerge(); const p = liz(0, 30);
+  let step = 0; // the first frame it actually walks in
+  until(b, p, (_e, bb) => { const z0 = step; step = bb.pos.z; return bb.pos.z - z0 > 1e-6 && z0 > 0; }, 8);
+  const z0 = b.pos.z; let moved = 0;
+  for (let i = 0; i < 5 && !moved; i++) { const z = b.pos.z; b.update(1 / 60, p, true); moved = b.pos.z - z; }
+  assert.ok(Math.abs(moved - 4 / 60) < 1e-6, `walks at 4 (moved ${moved}, from ${z0})`);
+});
+test('cat: drops in from above, and stays in view asleep when beaten', () => {
+  const b = cat(), p = liz(0, 10);
+  b.emerge(); b.update(1 / 60, p, true);
+  assert.ok(b.rig.position.y > 5, 'starts high');
+  for (let n = 6; n > 0; n--) {
+    stick(b, p); p.pos.set(b.pos.x, 0.9, b.pos.z); p.velY = -3;
+    b.update(1 / 60, p, true);
+    p.pos.set(b.pos.x, 0, b.pos.z + 10); p.velY = 0;
+    if (n > 1) until(b, p, (_e, bb) => bb.state !== 'recover');
+  }
+  assert.equal(b.state, 'defeated');
+  for (let i = 0; i < 300; i++) b.update(1 / 60, p, true);
+  assert.equal(b.rig.visible, true);
+  assert.ok(Math.abs(b.rig.position.y) < 0.2, 'on the ground, not sunk');
+});

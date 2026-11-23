@@ -56,10 +56,22 @@ export const LEVELS = [
     helpTouch: 'Left thumb: move (push far to run) · Right thumb: drag to look · 💪 scares kittens · Tail fools them',
     load: () => import('./yard.js'),
   },
+  {
+    id: 6,
+    boss: true,
+    icon: '🐱',
+    name: 'The Big Cat',
+    intro: 'The kittens have gone in for their supper, and ten golden pebbles lie on the lawn. But the kittens have a very big friend on the other side of the fence, and the last pebble will bring it over to play!',
+    title: '/assets/title-yard.jpg',
+    hint: 'Collect the 10 pebbles to bring the big cat · Dodge its pounce · Jump on its back while it is flopped over · Q drop tail to trick it',
+    help: 'Collect all ten pebbles and the big cat jumps the fence · Dodge its pounce, then jump on its back while it is flopped over · Q drops your tail to trick it · Hide from hairballs behind things · Tire it out and it falls asleep',
+    helpTouch: 'Collect all ten pebbles and the big cat jumps the fence · Dodge its pounce, then Jump onto its back while it is flopped over · Tail tricks it · Tire it out and it falls asleep',
+    load: () => import('./cat.js'),
+  },
 ];
 
 // What a level is called on screen: the boss has no number, so the levels after it
-// keep counting past each boss (Level 1, Boss, Level 2, Boss, Level 3).
+// keep counting past each boss (Level 1, Boss, Level 2, Boss, Level 3, Boss).
 export function levelLabel(level) {
   if (level.boss) return 'Boss';
   return `Level ${LEVELS.filter((l) => !l.boss && l.id <= level.id).length}`;
@@ -98,7 +110,7 @@ export function migrateUnlocks(store) {
     // whoever already had the Back Yard open keeps it (and gets the falcon).
     if (!storage.getItem(FALCON_FLAG)) {
       const n = Number(storage.getItem(KEY));
-      if (n >= 4) storage.setItem(KEY, String(Math.min(LEVELS.length, n + 1)));
+      if (n >= 4) storage.setItem(KEY, '5'); // the Back Yard's new id
       storage.setItem(FALCON_FLAG, '1');
     }
   } catch { /* private mode etc. */ }

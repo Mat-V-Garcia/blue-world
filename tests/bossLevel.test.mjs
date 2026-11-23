@@ -17,11 +17,9 @@ test('boulders are low cover, clear of the middle and of the start', () => {
     assert.ok(Math.hypot(b.x, b.z + 32) >= 8);
   }
 });
-test('the tarantula is second and the falcon fourth of five levels', () => {
-  assert.equal(LEVELS.length, 5);
-  assert.equal(LEVELS[1].boss, true);
-  assert.equal(LEVELS[3].boss, true);
-  assert.equal(LEVELS.filter((l) => l.boss).length, 2);
+test('every level is followed by its boss: tarantula, falcon, big cat', () => {
+  assert.equal(LEVELS.length, 6);
+  assert.deepEqual(LEVELS.map((l) => !!l.boss), [false, true, false, true, false, true]);
   for (const l of LEVELS.filter((x) => x.boss)) assert.ok(l.icon);
 });
 
@@ -45,4 +43,14 @@ test('falcon level: ten pebbles spread round the shops, low enough to reach from
     for (const q of FALCON_PEBBLES.slice(i + 1)) assert.ok(Math.hypot(p.x - q.x, p.z - q.z) >= 6);
   }
   assert.ok(PERCH.y > 25);
+});
+
+import { PEBBLES as CAT_PEBBLES, CAT_START } from '../src/levels/cat.js';
+test('cat level: ten pebbles on the ground, spread out, none where the cat lands', () => {
+  assert.equal(CAT_PEBBLES.length, 10);
+  for (const [i, p] of CAT_PEBBLES.entries()) {
+    assert.ok(Math.abs(p.x) <= 22 && Math.abs(p.z) <= 44 && p.hint, `pebble ${i}`);
+    assert.ok(Math.hypot(p.x - CAT_START.x, p.z - CAT_START.z) >= 6);
+    for (const q of CAT_PEBBLES.slice(i + 1)) assert.ok(Math.hypot(p.x - q.x, p.z - q.z) >= 6);
+  }
 });

@@ -20,10 +20,14 @@ const WALK_ROUND = 3;    // ...and after one it walks round the rock this long b
 const EMERGE = 1.5;      // seconds it takes to climb out of the sand (harmless meanwhile)
 const SNAP = 2.6;        // how far past its body the fangs reach when a rock or the wall stops a lunge
 
+// The same rules run the big cat in the back yard (it pounces, flops, and coughs hairballs).
 // makeModel(): { root, update(dt, speed) } (the tarantula model or the simple stand-in).
 // cfg: { x, z, health?, scale?, hidden? }  hidden: it waits under the sand until emerge()
+//   tune?: overrides for the numbers in BOSS; shotColor?: colour of what it shoots;
+//   emergeFrom?: height it arrives from (default: up out of the ground; positive: drops in);
+//   sleeps?: when beaten it curls up where it is instead of sinking out of sight
 export function createBoss(scene, colliders, makeModel, cfg = {}) {
-  const B = BOSS, SCALE = cfg.scale ?? 5;
+  const B = { ...BOSS, ...cfg.tune }, SCALE = cfg.scale ?? 5;
   const v = makeModel();
   const rig = new THREE.Group(), tilt = new THREE.Group();
   v.root.scale.setScalar(SCALE);
@@ -32,13 +36,13 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
   const sx = cfg.x ?? 0, sz = cfg.z ?? 0;
   const boss = {
     pos: new THREE.Vector3(), yaw: 0, health: 0, maxHealth: cfg.health ?? B.HEALTH,
-    state: 'approach', webs: [],
+    state: 'approach', webs: [], bodyR: B.BODY_R, webTime: B.WEB_TIME,
     rig, // the model's group (for checks and debugging)
   };
   let timer = 0, rest = 0, speed = 0, pendingWindup = null;
   let noLunge = 0; // walking round a rock: no lunges for this long
   let webCD = 1, perch = 0, shots = 0, followUp = false; // followUp: lunge next (just webbed the lizard)
-  const webMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const webMat = new THREE.MeshBasicMaterial({ color: cfg.shotColor ?? 0xffffff });
   const webGeo = new THREE.IcosahedronGeometry(0.28, 1);
   const target = new THREE.Vector2(), dir = new THREE.Vector2();
   let lungeLen = 0, travelled = 0;
@@ -115,7 +119,7 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
   boss.emerge = () => {
     if (boss.state !== 'hidden') return false;
     boss.state = 'emerge'; timer = EMERGE;
-    pose = { rx: -0.3, sy: 1, y: -B.BACK_UP * 1.4 };
+    pose = { rx: -0.3, sy: 1, y: cfg.emergeFrom ?? -B.BACK_UP * 1.4 };
     rig.visible = true;
     return true;
   };
@@ -244,16 +248,16 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
     const want = s === 'windup' ? { rx: -0.45, sy: 1, y: 0.5 }
       : s === 'stuck' ? { rx: 0.28, sy: 0.36, y: 0 }
         : s === 'webwind' ? { rx: 0.3, sy: 1, y: 0.2 }
-          : s === 'defeated' ? { rx: 0, sy: 0.3, y: -B.BACK_UP * 1.4 }
+          : s === 'defeated' ? (cfg.sleeps ? { rx: 0.1, sy: 0.5, y: 0 } : { rx: 0, sy: 0.3, y: -B.BACK_UP * 1.4 })
           : { rx: 0, sy: 1, y: 0 };
     const k = Math.min(1, dt * (s === 'defeated' ? 0.8 : s === 'emerge' ? 2.5 : 9));
     pose.rx += (want.rx - pose.rx) * k; pose.sy += (want.sy - pose.sy) * k; pose.y += (want.y - pose.y) * k;
-    if (s === 'defeated') { timer += dt; if (timer > 3) rig.visible = false; }
+    if (s === 'defeated') { timer += dt; if (timer > 3 && !cfg.sleeps) rig.visible = false; }
     rig.position.copy(boss.pos); rig.position.y += pose.y;
     rig.rotation.y = boss.yaw;
     tilt.rotation.x = pose.rx + (s === 'stuck' ? Math.sin(timer * 30) * 0.03 : 0); // strains while stuck
     tilt.scale.y = pose.sy;
-    v.update(dt, s === 'stuck' ? 1.5 : speed / 2.5);
+    v.update(dt, s === 'stuck' ? 1.5 : s === 'defeated' ? 0 : speed / 2.5);
     return ev;
   };
   return boss;

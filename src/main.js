@@ -180,9 +180,9 @@ async function init() {
     return g;
   });
   if (world.boss) {
-    boss = (world.boss.kind === 'falcon' ? createFalcon : createBoss)(scene, world.colliders, makeEnemy, world.boss);
+    boss = (world.boss.kind === 'falcon' ? createFalcon : createBoss)(scene, world.colliders, () => makeEnemy(world.boss.coat), world.boss);
     document.querySelector('#bossbar span').textContent = world.boss.text.name;
-    storm = createStorm(scene, { sky: world.sky, fog: scene.fog, hemi, sun });
+    storm = createStorm(scene, { sky: world.sky, fog: scene.fog, hemi, sun, lightning: world.boss.lightning });
     document.body.classList.add('boss');
     // web strands shown round the lizard while it is webbed
     strands = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 1), new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true }));
@@ -330,7 +330,7 @@ function bossFrame(dt, playing) {
   const ev = boss.update(dt, player, playing && invuln <= 0);
   const bounce = () => { player.velY = 9; player.onGround = false; };
   if (ev.caught) getHurt(ev.caught);
-  if (ev.webbed) { player.webbed = BOSS.WEB_TIME; toast('Webbed!'); sfx.webbed(); }
+  if (ev.webbed) { player.webbed = boss.webTime; toast(world.boss.text.webbed ?? 'Webbed!'); sfx.webbed(); }
   if (ev.hit) {
     bounce(); sfx.bossHit(); drawBoss();
     dust.puff(boss.pos, 14, 2);
@@ -343,7 +343,7 @@ function bossFrame(dt, playing) {
     if (ev.bonked) { toast('Bonk!'); dust.puff(boss.pos, 8, 1.5); }
     else if (!stuckTold) { stuckTold = true; toast(world.boss.text.stuck); }
   }
-  if (ev.windupNow === 'lunge') sfx.hiss();
+  if (ev.windupNow === 'lunge') (world.boss.kind === 'cat' ? sfx.meow : sfx.hiss)();
   if (ev.windupNow === 'dive') sfx.screech();
   if (ev.shotNow) sfx.web();
   if (ev.splat) {
@@ -353,7 +353,7 @@ function bossFrame(dt, playing) {
   }
   if (ev.defeated && state === 'play') {
     state = 'win';
-    storm.set(0); // the sky clears
+    if (!world.boss.sleeps) storm.set(0); // the sky clears (the cat sleeps on under its sunset)
     toast('You did it!');
     dust.puff(boss.pos, 30, 3);
     setTimeout(() => sfx.win(), 1500);
@@ -362,7 +362,7 @@ function bossFrame(dt, playing) {
       $('win-title').textContent = world.boss.text.winTitle;
       const next = LEVELS[LEVEL_ID]; // the level after the boss, if there is one
       if (next) unlockLevel(next.id);
-      $('win-msg').textContent = next ? `${world.boss.text.winMsg} ${levelLabel(next)} · ${next.name} is unlocked!` : 'Blue World is safe again. Do a victory push-up!';
+      $('win-msg').textContent = next ? `${world.boss.text.winMsg} ${levelLabel(next)} · ${next.name} is unlocked!` : `${world.boss.text.winMsg} Blue World is safe again. Do a victory push-up!`;
       $('next').classList.toggle('hidden', !next);
       $('win').classList.remove('hidden');
     }, 3000);
@@ -521,6 +521,7 @@ function frame(dt) {
       if (boss.emerge()) {
         drawBoss();
         if (world.boss.kind === 'falcon') sfx.screech();
+        else if (world.boss.kind === 'cat') sfx.meow();
         else { dust.puff(boss.pos, 40, 3.5); sfx.thunder(); sfx.hiss(); }
       }
     } else if (collected === TOTAL) {

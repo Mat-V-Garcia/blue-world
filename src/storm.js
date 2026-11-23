@@ -24,7 +24,8 @@ export function lightningGap(storm, rand) {
 
 // sky: { top, bottom, painting } from buildSky (may be null); fog: scene.fog;
 // hemi / sun: the scene's HemisphereLight and DirectionalLight.
-export function createStorm(scene, { sky, fog, hemi, sun }, rand = Math.random) {
+// lightning: false gives the colours only (the cat boss's sunset).
+export function createStorm(scene, { sky, fog, hemi, sun, lightning = true }, rand = Math.random) {
   const pairs = []; // [colour to drive, its calm value, its storm value]
   const pair = (c, hex) => { if (c) pairs.push([c, c.clone(), new THREE.Color(hex)]); };
   pair(sky?.top, RED.top); pair(sky?.bottom, RED.bottom); pair(sky?.painting?.color, RED.painting);
@@ -68,7 +69,7 @@ export function createStorm(scene, { sky, fog, hemi, sun }, rand = Math.random) 
 
       if (bolt && (boltT -= dt) <= 0) { scene.remove(bolt); bolt.children.forEach((m) => m.geometry.dispose()); bolt = null; }
       let struck = false;
-      if (k < 0.5) next = null;
+      if (k < 0.5 || !lightning) next = null;
       else if (next === null) next = lightningGap(k, rand());
       else if ((next -= dt) <= 1e-9) { strike(lookYaw); struck = true; next = lightningGap(k, rand()); }
       return { bolt: struck };
