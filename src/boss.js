@@ -16,6 +16,8 @@ export const BOSS = {
 };
 const REST = 0.6;        // stands still this long after pulling free or catching the lizard
 const SHORT_LUNGE = 1.5; // a lunge stopped by a rock sooner than this isn't a real miss
+const WALK_ROUND = 3;    // ...and after one it walks round the rock this long before lunging again
+const SNAP = 2.6;        // how far past its body the fangs reach when a rock or the wall stops a lunge
 
 // makeModel(): { root, update(dt, speed) } (the tarantula model or the simple stand-in).
 // cfg: { x, z, health?, scale? }
@@ -33,6 +35,7 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
     rig, // the model's group (for checks and debugging)
   };
   let timer = 0, rest = 0, speed = 0, pendingWindup = null;
+  let noLunge = 0; // walking round a rock: no lunges for this long
   let webCD = 1, perch = 0, shots = 0, followUp = false; // followUp: lunge next (just webbed the lizard)
   const webMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const webGeo = new THREE.IcosahedronGeometry(0.28, 1);
@@ -49,7 +52,7 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
   // rocks tall enough to stop it (it steps over anything lower)
   const rockAt = (x, z) => {
     const g = terrainHeight(x, z);
-    for (const c of colliders) if (c.top > g + 0.5 && footprint(c, x, z).dist < B.BODY_R) return c;
+    for (const c of colliders) if (c.top > g + 0.5 && footprint(c, x, z, g + 0.3).dist < B.BODY_R) return c;
     return null;
   };
   function walkTo(x, z, dt) {
@@ -60,7 +63,7 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
     const g = terrainHeight(nx, nz);
     for (const c of colliders) {
       if (c.top <= g + 0.5) continue;
-      const f = footprint(c, nx, nz);
+      const f = footprint(c, nx, nz, g + 0.3);
       if (f.dist < B.BODY_R) { // push out and slide round it
         nx += f.nx * (B.BODY_R - f.dist) - f.nz * step * 0.6;
         nz += f.nz * (B.BODY_R - f.dist) + f.nx * step * 0.6;
@@ -99,7 +102,7 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
     boss.pos.set(sx, terrainHeight(sx, sz), sz);
     boss.yaw = 0; boss.health = boss.maxHealth; boss.state = 'approach';
     timer = 0; rest = 0; speed = 0; pendingWindup = null;
-    webCD = 1; perch = 0; shots = 0; followUp = false;
+    webCD = 1; perch = 0; shots = 0; followUp = false; noLunge = 0;
     clearWebs();
     pose = { rx: 0, sy: 1, y: 0 };
     rig.visible = true;
@@ -122,6 +125,8 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
     const dist = Math.hypot(px - boss.pos.x, pz - boss.pos.z);
     speed = 0;
 
+    const inSnap = () => Math.hypot(px - boss.pos.x, pz - boss.pos.z) < B.BODY_R + SNAP && player.pos.y - boss.pos.y < B.BACK_UP - 0.6;
+    noLunge -= dt;
     if (boss.state === 'approach') {
       face(px, pz, dt);
       const perched = perch >= B.PERCH_TIME;
@@ -129,7 +134,7 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
       else if (followUp) {
         if (dist <= B.LUNGE_TRAVEL) { followUp = false; startWindup(px, pz); } else walkTo(px, pz, dt);
       } else if ((dist > B.WEB_RANGE || perched) && webCD <= 0) startWebWind();
-      else if (dist <= B.LUNGE_RANGE) startWindup(px, pz);
+      else if (dist <= B.LUNGE_RANGE && noLunge <= 0) startWindup(px, pz);
       else walkTo(px, pz, dt);
     } else if (boss.state === 'webwind') {
       face(px, pz, dt);
@@ -160,11 +165,15 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
         // Stopped by a boulder. A lizard sitting on that boulder gets snapped at;
         // otherwise the fangs are stuck (unless it had barely set off).
         const onIt = footprint(rock, px, pz).dist <= 0.3 && player.pos.y > terrainHeight(px, pz) + 0.5;
-        if (onIt && canHurt) { ev.caught = boss.pos.clone(); boss.state = 'approach'; rest = REST * 2; }
+        if ((onIt || inSnap()) && canHurt) { ev.caught = boss.pos.clone(); boss.state = 'approach'; rest = REST * 2; }
         else if (travelled >= SHORT_LUNGE) stick(ev);
-        else { boss.state = 'approach'; rest = REST; }
+        else { boss.state = 'approach'; rest = REST; noLunge = WALK_ROUND; }
       } else if (cx !== nx || cz !== nz) {
-        boss.pos.x = cx; boss.pos.z = cz; stick(ev); // ran into the arena wall
+        // Ran into the arena wall. The lizard can tuck in closer to the wall than the boss
+        // can, so the fangs reach it there (otherwise the wall is a free-hit machine).
+        boss.pos.x = cx; boss.pos.z = cz;
+        if (inSnap() && canHurt) { ev.caught = boss.pos.clone(); boss.state = 'approach'; rest = REST * 2; }
+        else stick(ev);
       } else {
         boss.pos.x = nx; boss.pos.z = nz; travelled += step;
         if (travelled >= lungeLen - 1e-6) stick(ev);
@@ -184,7 +193,7 @@ export function createBoss(scene, colliders, makeModel, cfg = {}) {
       w.pos.lerpVectors(w.from, w.to, w.k);
       w.pos.y += Math.sin(w.k * Math.PI) * 0.6; // gentle arc, low enough for boulders to block
       w.mesh.position.copy(w.pos);
-      let gone = colliders.some((c) => w.pos.y > c.bottom && w.pos.y < c.top && footprint(c, w.pos.x, w.pos.z).dist < 0.2);
+      let gone = colliders.some((c) => w.pos.y > c.bottom && w.pos.y < c.top && footprint(c, w.pos.x, w.pos.z, w.pos.y).dist < 0.2);
       if (!gone && canHurt && boss.state !== 'defeated' && Math.hypot(w.pos.x - px, w.pos.z - pz) < 0.7 && Math.abs(w.pos.y - player.pos.y - 0.2) < 1) {
         ev.webbed = true; followUp = true; gone = true;
       }

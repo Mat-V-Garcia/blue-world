@@ -313,6 +313,7 @@ function toast(msg) {
 // ---------- Boss fight (boss level only) ----------
 const splatGeo = new THREE.CircleGeometry(0.9, 9).rotateX(-Math.PI / 2);
 function bossFrame(dt, playing) {
+  if (state === 'title') { storm.update(dt); return; } // it waits in the middle until Play is pressed
   const ev = boss.update(dt, player, playing && invuln <= 0);
   const bounce = () => { player.velY = 9; player.onGround = false; };
   if (ev.caught) getHurt(ev.caught);

@@ -163,3 +163,29 @@ test('reset restores full health, the start spot and clears webs', () => {
   assert.equal(b.health, 6); assert.equal(b.webs.length, 0);
   assert.equal(b.state, 'approach'); assert.deepEqual([b.pos.x, b.pos.z], [0, 0]);
 });
+
+// ---- from the whole-branch review ----
+const count = (b, p, secs, key) => { let n = 0; for (let i = 0; i < secs * 60; i++) if (b.update(1 / 60, p, true)[key]) n++; return n; };
+
+test('a lizard standing still behind a boulder is not safe for ever: the boss walks round', () => {
+  const rock = { type: 'circle', x: 0, z: 6, r: 1.5, bottom: -100, top: 2.2, climbable: true };
+  const b = make([rock]), p = liz(0, 11);
+  let caught = 0, windups = 0;
+  for (let i = 0; i < 40 * 60; i++) { const e = b.update(1 / 60, p, true); if (e.caught) caught++; if (e.windupNow === 'lunge') windups++; }
+  assert.ok(caught >= 1, `caught ${caught}`);
+  assert.ok(windups <= 20, `wind-ups ${windups}`);
+});
+
+test('a lizard standing still against the arena wall gets caught, not free hits', () => {
+  const b = make(), p = liz(0, 40);
+  let caught = 0, stuck = 0;
+  for (let i = 0; i < 30 * 60; i++) { const e = b.update(1 / 60, p, true); if (e.caught) caught++; if (e.stuckNow) stuck++; }
+  assert.ok(caught >= 2, `caught ${caught}`);
+  assert.equal(stuck, 0);
+});
+
+test('a web is stopped by the wide base of a boulder, not just its narrow top', () => {
+  const rock = { type: 'circle', x: 0, z: 20, r: 2.4, rAt: (y) => (y < 1.4 ? 2.2 : 0.8), bottom: -100, top: 2.2, climbable: true };
+  const b = make([rock]), p = liz(2.5, 30);
+  assert.equal(count(b, p, 4, 'webbed'), 0);
+});
