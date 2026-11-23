@@ -6,12 +6,12 @@ import { terrainHeight, footprint, clampToWorld } from './world.js';
 // are stuck in the sand after a missed lunge. It is never a solid collider: main.js acts
 // on the events update() reports.
 export const BOSS = {
-  HEALTH: 6, WALK: 3, LUNGE_RANGE: 14, LUNGE_TRAVEL: 22, LUNGE_SPEED: 18, OVERSHOOT: 3,
-  WINDUP: 0.8, STUCK_MAX: 2.5, STUCK_MIN: 1.8, RECOVER: 1.5,
+  HEALTH: 6, WALK: 3.5, LUNGE_RANGE: 14, LUNGE_TRAVEL: 22, LUNGE_SPEED: 20, OVERSHOOT: 3,
+  WINDUP: 0.8, STUCK_MAX: 2.2, STUCK_MIN: 1.6, RECOVER: 1.5,
   BODY_R: 2.2,          // touch / landing radius
   BACK_UP: 2.3,         // back height when standing (the model at scale 5 is 2.34 tall)
   BACK_STUCK: 1.0,      // back height while stuck (reachable by a jump)
-  WEB_RANGE: 14, WEB_WINDUP: 0.6, WEB_SPEED: 16, WEB_TIME: 2.5, WEB_COOLDOWN: 3,
+  WEB_RANGE: 14, WEB_WINDUP: 0.6, WEB_SPEED: 16, WEB_TIME: 2.5, WEB_COOLDOWN: 2.5,
   PERCH_HEIGHT: 1, PERCH_TIME: 2, TAIL_RANGE: 20, ANGRY_BELOW: 0.5, ANGRY_WINDUP: 0.75,
 };
 const REST = 0.6;        // stands still this long after pulling free or catching the lizard

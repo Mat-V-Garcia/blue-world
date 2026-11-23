@@ -32,11 +32,11 @@ test('a lunge that reaches the lizard costs a heart', () => {
   const e = until(b, p, (ev) => ev.caught);
   assert.ok(e.caught.isVector3);
 });
-test('a dodged lunge leaves it stuck, then it pulls free after 2.5 s at full health', () => {
+test('a dodged lunge leaves it stuck, then it pulls free after 2.2 s at full health', () => {
   const b = make(), p = liz(0, 10);
   stick(b, p);
   assert.equal(b.state, 'stuck');
-  for (let i = 0; i < 2.4 * 60; i++) b.update(1 / 60, p, true);
+  for (let i = 0; i < 2.1 * 60; i++) b.update(1 / 60, p, true);
   assert.equal(b.state, 'stuck');
   for (let i = 0; i < 0.2 * 60; i++) b.update(1 / 60, p, true);
   assert.notEqual(b.state, 'stuck');
@@ -74,7 +74,7 @@ test('landing on its back when it is not stuck only bounces', () => {
   const e = b.update(1 / 60, p, true);
   assert.equal(e.bounced, true); assert.equal(b.health, 6); assert.equal(e.caught, null);
 });
-test('stuck time shrinks to 1.8 s at 1 health; the sixth hit defeats it', () => {
+test('stuck time shrinks to 1.6 s at 1 health; the sixth hit defeats it', () => {
   const b = make(), p = liz(0, 10);
   for (let n = 6; n > 1; n--) {
     stick(b, p); p.pos.set(b.pos.x, 0.9, b.pos.z); p.velY = -3;
@@ -84,7 +84,11 @@ test('stuck time shrinks to 1.8 s at 1 health; the sixth hit defeats it', () => 
   }
   assert.equal(b.health, 1);
   stick(b, p);
-  for (let i = 0; i < 1.7 * 60; i++) b.update(1 / 60, p, true);
+  for (let i = 0; i < 1.5 * 60; i++) b.update(1 / 60, p, true);
+  assert.equal(b.state, 'stuck');
+  for (let i = 0; i < 0.2 * 60; i++) b.update(1 / 60, p, true);
+  assert.notEqual(b.state, 'stuck');
+  stick(b, p);
   assert.equal(b.state, 'stuck');
   p.pos.set(b.pos.x, 0.9, b.pos.z); p.velY = -3;
   const e = b.update(1 / 60, p, true);
@@ -188,4 +192,8 @@ test('a web is stopped by the wide base of a boulder, not just its narrow top', 
   const rock = { type: 'circle', x: 0, z: 20, r: 2.4, rAt: (y) => (y < 1.4 ? 2.2 : 0.8), bottom: -100, top: 2.2, climbable: true };
   const b = make([rock]), p = liz(2.5, 30);
   assert.equal(count(b, p, 4, 'webbed'), 0);
+});
+
+test('tuning: a little harder than the first version', () => {
+  assert.deepEqual([BOSS.WALK, BOSS.LUNGE_SPEED, BOSS.WEB_COOLDOWN], [3.5, 20, 2.5]);
 });
