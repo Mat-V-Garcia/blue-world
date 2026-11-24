@@ -345,6 +345,8 @@ export async function build(scene) {
     solids,
     horizonColor,
     pebbleSpots,
+    // straight ahead of where the lizard starts (the start area is kept clear of bushes and rocks)
+    portal: { x: 3.4, z: 3.4, yaw: Math.PI * 0.25 },
     update(dt, t) {
       for (const tw of tumbleweeds) {
         tw.position.x += tw.userData.speed * dt;

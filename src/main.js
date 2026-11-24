@@ -16,6 +16,7 @@ import { createTailDrop } from './tail.js';
 import { createBoss, BOSS } from './boss.js';
 import { createFalcon } from './falcon.js';
 import { createStorm, stormLevel } from './storm.js';
+import { createPortal, createFlip } from './portal.js';
 
 const TOTAL = 10;
 const $ = (id) => document.getElementById(id);
@@ -33,6 +34,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 
 const scene = new THREE.Scene();
+const flip = createFlip(renderer); // the colour-flipped world on the far side of a portal
 // Clear midday air: pale blue haze, pushed far out (colour replaced by the painted sky's horizon)
 scene.fog = new THREE.Fog(0xcfe3f2, 70, 260);
 
@@ -127,6 +129,7 @@ let world, player, lizard, pebbles, dust, tarantulas, tail;
 let collected = 0;
 // Boss level only: the giant tarantula, the storm it brings, and bits of web
 let boss = null, storm = null, stuckTold = false, strands = null;
+let portal = null; // a level can have a portal: walking through it flips the world's colours
 const splats = [];
 // Health: 5 hearts. A touch costs one; they refill slowly if you stay out of trouble.
 const MAX_HEARTS = 5, INVULN_TIME = 1.6, REGEN_DELAY = 8, REGEN_EVERY = 10;
@@ -189,6 +192,8 @@ async function init() {
     strands.position.y = 0.2; strands.scale.z = 1.7; strands.visible = false;
     lizard.root.add(strands);
   }
+  if (world.portal) portal = createPortal(scene, world.portal, terrainHeight(world.portal.x, world.portal.z));
+  flip.markUnflipped(scene, lizard.root); // the lizard keeps its own colours
   reset();
   state = 'title';
   renderer.setAnimationLoop(loop);
@@ -218,6 +223,8 @@ function reset() {
   boss?.reset();
   storm?.reset();
   stuckTold = false;
+  flip.on = false;
+  portal?.reset();
   drawBoss();
 }
 
@@ -506,6 +513,13 @@ function frame(dt) {
 
   // world + pebbles
   world.update(dt, t);
+  if (portal?.update(dt, t, player.pos) && playing) {
+    flip.on = !flip.on;
+    sfx.portal();
+    toast(flip.on ? 'Whoa! Flipped world!' : 'Back to normal');
+    $('flash').classList.add('show');
+    setTimeout(() => $('flash').classList.remove('show'), 160);
+  }
   dust.update(dt);
   const got = pebbles.update(dt, t, new THREE.Vector3(player.pos.x, player.pos.y + 0.25, player.pos.z));
   if (got && playing) {
@@ -579,9 +593,9 @@ function frame(dt) {
   sun.position.copy(player.pos).addScaledVector(SUN_DIR, 80);
   sun.target.position.copy(player.pos);
 
-  renderer.render(scene, camera);
+  flip.render(scene, camera);
 }
 
 init();
 // handy for debugging / testing in the console
-window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = v; }, set camPitch(v) { camPitch = v; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, get boss() { return boss; }, get storm() { return storm; }, start, frame };
+window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = v; }, set camPitch(v) { camPitch = v; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, get boss() { return boss; }, get storm() { return storm; }, get portal() { return portal; }, get flip() { return flip; }, start, frame };

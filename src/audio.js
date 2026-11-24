@@ -51,6 +51,7 @@ export const sfx = {
     tone(base * 1.5, 0.07, 0.3, 'triangle', 0.15);
     tone(base * 2, 0.14, 0.4, 'sine', 0.12);
   },
+  portal() { tone(220, 0, 0.5, 'sine', 0.12, 1760); tone(330, 0.05, 0.5, 'triangle', 0.08, 2640); noise(0, 0.45, 0.05, 2500, 'bandpass'); },
   jump() { tone(300, 0, 0.15, 'sine', 0.08, 520); },
   land() { tone(120, 0, 0.08, 'triangle', 0.08, 70); },
   scare() { tone(700, 0, 0.09, 'square', 0.06, 1400); tone(1400, 0.08, 0.16, 'triangle', 0.08, 500); },
