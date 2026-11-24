@@ -470,6 +470,7 @@ export async function build(scene) {
     sky,
     pebbleSpots,
     spawn: { x: -2.5, z: -42, yaw: 0 }, // on the path, looking up the yard to the porch
+    portal: { x: -2.5, z: -35.5, yaw: 0 }, // on the path, straight ahead of the start
     enemies: {
       kind: 'kitten', defeatable: false, scareable: true,
       homes: [[-2.5, -10], [-15, -18], [-11, 24], [6, -12], [7, 14], [-2.5, 31], [19.5, -8], [-18, 34]],
