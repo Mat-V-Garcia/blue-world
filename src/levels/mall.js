@@ -381,6 +381,7 @@ export async function build(scene) {
     sky,
     pebbleSpots,
     spawn: { x: 2, z: -2, yaw: Math.PI * 0.85 }, // looking into the plaza
+    portal: { x: -0.5, z: -8, yaw: Math.PI * 1.125 }, // just ahead of the start, in a clear patch of the car park
     enemies: {
       kind: 'pigeon',
       homes: [[-26, 22], [-8, 12], [14, -28], [22, -26], [-26, -12], [32, 6], [-50, 24], [44, -30]],
