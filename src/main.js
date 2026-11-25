@@ -16,7 +16,7 @@ import { createTailDrop } from './tail.js';
 import { createBoss, BOSS } from './boss.js';
 import { createFalcon } from './falcon.js';
 import { createStorm, stormLevel } from './storm.js';
-import { createPortal, createFlip } from './portal.js';
+import { createPortal, createFlip, createRedSkin } from './portal.js';
 
 const TOTAL = 10;
 const $ = (id) => document.getElementById(id);
@@ -35,6 +35,11 @@ renderer.toneMappingExposure = 1.0;
 
 const scene = new THREE.Scene();
 const flip = createFlip(renderer); // the colour-flipped world on the far side of a portal
+const redSkin = createRedSkin();   // ...where the enemies turn red and black
+function setFlipped(on) {
+  flip.on = on;
+  tarantulas?.spiders.forEach((s) => redSkin.apply(s.v.root, on));
+}
 // Clear midday air: pale blue haze, pushed far out (colour replaced by the painted sky's horizon)
 scene.fog = new THREE.Fog(0xcfe3f2, 70, 260);
 
@@ -194,6 +199,7 @@ async function init() {
   }
   if (world.portal) portal = createPortal(scene, world.portal, terrainHeight(world.portal.x, world.portal.z));
   flip.markUnflipped(scene, lizard.root); // the lizard keeps its own colours
+  tarantulas.spiders.forEach((s) => flip.markUnflipped(scene, s.v.root)); // enemies go red and black instead
   reset();
   state = 'title';
   renderer.setAnimationLoop(loop);
@@ -223,7 +229,7 @@ function reset() {
   boss?.reset();
   storm?.reset();
   stuckTold = false;
-  flip.on = false;
+  setFlipped(false);
   portal?.reset();
   drawBoss();
 }
@@ -514,7 +520,7 @@ function frame(dt) {
   // world + pebbles
   world.update(dt, t);
   if (portal?.update(dt, t, player.pos) && playing) {
-    flip.on = !flip.on;
+    setFlipped(!flip.on);
     sfx.portal();
     toast(flip.on ? 'Whoa! Flipped world!' : 'Back to normal');
     $('flash').classList.add('show');
@@ -598,4 +604,4 @@ function frame(dt) {
 
 init();
 // handy for debugging / testing in the console
-window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = v; }, set camPitch(v) { camPitch = v; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, get boss() { return boss; }, get storm() { return storm; }, get portal() { return portal; }, get flip() { return flip; }, start, frame };
+window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = v; }, set camPitch(v) { camPitch = v; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, get boss() { return boss; }, get storm() { return storm; }, get portal() { return portal; }, get flip() { return flip; }, setFlipped, start, frame };

@@ -104,3 +104,38 @@ export function createFlip(renderer) {
     },
   };
 }
+
+// In the flipped world the enemies don't flip like everything else: they turn red and
+// black. Light parts of an enemy go red, dark parts go black. (They also have to be
+// marked unflipped, like the lizard, so the flip leaves these colours alone.)
+export function createRedSkin() {
+  const reds = new Map(); // an enemy's own material -> its red-and-black copy
+  const redOf = (mat) => {
+    if (!reds.has(mat)) {
+      const m = mat.clone();
+      m.onBeforeCompile = (shader) => {
+        shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+          float redSkinL = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+          diffuseColor.rgb = mix(vec3(0.012), vec3(1.0, 0.04, 0.02), smoothstep(RED_LO, RED_HI, redSkinL));`)
+          .replace('void main() {', `#define RED_LO ${RED_RAMP[0].toFixed(3)}\n#define RED_HI ${RED_RAMP[1].toFixed(3)}\nvoid main() {`);
+      };
+      m.customProgramCacheKey = () => 'redskin';
+      reds.set(mat, m);
+    }
+    return reds.get(mat);
+  };
+  return {
+    // switch one enemy (its whole model) to red and black, or back to its own colours
+    apply(root, on) {
+      root.traverse((o) => {
+        if (!o.isMesh || !o.material) return;
+        o.userData.ownMaterial ??= o.material;
+        const own = o.userData.ownMaterial;
+        o.material = !on ? own : Array.isArray(own) ? own.map(redOf) : redOf(own);
+      });
+    },
+  };
+}
+// How bright a part of the enemy must be to count as black (below the first number)
+// or fully red (above the second).
+const RED_RAMP = [0.03, 0.3];
