@@ -1,7 +1,7 @@
-// The list of levels, in order. Each level module exports build(scene), which returns
-// { colliders, solids, pebbleSpots, horizonColor, update(dt, t), enemies? }.
+// The six regular levels, in order. Each level module exports build(scene, { inverted }),
+// which returns { colliders, solids, pebbleSpots, horizonColor, update(dt, t), enemies? }.
 // hint / help / helpTouch: the controls reminders shown in play and on the title screen.
-export const LEVELS = [
+const REGULAR = [
   {
     id: 1,
     name: 'The Desert',
@@ -70,8 +70,29 @@ export const LEVELS = [
   },
 ];
 
+// The inverted levels: the same six again, colour-flipped and harder, played after Mama
+// Cat. Same places, new pebble spots (in the three regular levels), tougher enemies and
+// bosses (see ./inverted.js). Only the name and the story differ here.
+const INVERTED_INTROS = [
+  'Mama Cat is asleep, but Blue World has turned inside out! The sky is the wrong colour, the tarantulas glow red, and they are quicker than before. Ten golden pebbles are hiding in new places. Find them all!',
+  'The inverted arena is quiet, but the giant tarantula under the sand has turned red and angry. It is faster, it shakes its fangs loose sooner, and it takes more to send it back. The last pebble will wake it!',
+  'The shops have flipped too. The pigeons are red, there are more of them, and they spot a lizard from further away. Ten golden pebbles are hiding in new places among the cars and planters.',
+  'The red falcon is watching from the clock tower. It dives sooner and faster, and it is back in the air quicker than before. The last pebble will bring it down!',
+  'The back yard has turned inside out, and the red kittens are faster and there are more of them. They still only want to play. Ten golden pebbles are hiding in new places.',
+  'One last game. Red Mama Cat is quicker with her paw and her pounce, she gets up sooner, and she takes longer to tire out. The last pebble will bring her over the fence!',
+];
+export const LEVELS = [
+  ...REGULAR,
+  ...REGULAR.map((l, i) => ({
+    ...l, id: l.id + REGULAR.length, inverted: true,
+    name: `Inverted ${l.name.replace(/^The /, '')}`,
+    intro: INVERTED_INTROS[i],
+  })),
+];
+
 // What a level is called on screen: the boss has no number, so the levels after it
-// keep counting past each boss (Level 1, Boss, Level 2, Boss, Level 3, Boss).
+// keep counting past each boss (Level 1, Boss, Level 2, Boss, Level 3, Boss, and on
+// through the inverted levels: Level 4, Boss, Level 5, Boss, Level 6, Boss).
 export function levelLabel(level) {
   if (level.boss) return 'Boss';
   return `Level ${LEVELS.filter((l) => !l.boss && l.id <= level.id).length}`;

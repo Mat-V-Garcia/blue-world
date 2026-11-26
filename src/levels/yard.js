@@ -43,7 +43,8 @@ const speckle = (base, dots, n) => (g, w, h) => {
   }
 };
 
-export async function build(scene) {
+// inverted: the colour-flipped second visit, with the pebbles in new places
+export async function build(scene, { inverted = false } = {}) {
   setGround({ height: groundHeight, radius: 60, bounds: { x0: X0, x1: X1, z0: Z0, z1: Z1 } });
   const [yardSky, grassTex, concreteTex, clapTex] = await Promise.all([
     loadTexture('sky-yard.jpg'), loadTexture('grass.jpg'), loadTexture('concrete.jpg'), loadTexture('clapboard.jpg'),
@@ -450,7 +451,7 @@ export async function build(scene) {
   }
 
   // ---------- Pebbles ----------
-  const pebbleSpots = [
+  const regularSpots = [
     { x: GX, z: GZ, y: gazeboTop + 0.6, hint: 'On the gazebo roof' },
     { x: PX, z: PZ + 1, y: DECK + 0.6, hint: 'Up in the playhouse' },
     { x: WX, z: WZ - 4, y: SEAT + 0.6, hint: 'On the swing' },
@@ -462,6 +463,20 @@ export async function build(scene) {
     { x: TX - 0.9, z: TZ + 0.2, y: TTOP + 0.6, hint: 'On the patio table' },
     { x: 23.5, z: 14, y: FENCE_H + 0.6, hint: 'Along the fence top' },
   ];
+  // The inverted level: ten different places, reached the same ways as the ones above.
+  const invertedSpots = [
+    { x: -2.5, z: -36, y: 0.6, hint: 'An easy one!' },
+    { x: TX, z: TZ, y: 0.5, hint: 'Under the patio table' },
+    { x: WX, z: WZ - 0.8, y: SEAT + 0.6, hint: 'On the other swing' },
+    { x: PX, z: PZ, y: 0.4, hint: 'Under the playhouse' },
+    { x: 16, z: -30, y: 1.5 + 0.6, hint: 'On the bench' },
+    { x: 23.5, z: -30, y: FENCE_H + 0.6, hint: 'Fence top, by the shed' },
+    { x: GX + 5, z: GZ + 5, y: EAVE + RISE * 3.5 / TIERS + 0.6, hint: 'Edge of the gazebo roof' },
+    { x: 0, z: 43.5, y: PORCH_H + 0.6, hint: 'On the porch' },
+    { x: -21, z: 30, y: 0.6, hint: 'By the white house' },
+    { x: -22.5, z: -37, y: 0.6, hint: 'Behind the big ball' },
+  ];
+  const pebbleSpots = inverted ? invertedSpots : regularSpots;
 
   return {
     colliders,
@@ -470,7 +485,6 @@ export async function build(scene) {
     sky,
     pebbleSpots,
     spawn: { x: -2.5, z: -42, yaw: 0 }, // on the path, looking up the yard to the porch
-    portal: { x: -2.5, z: -35.5, yaw: 0 }, // on the path, straight ahead of the start
     enemies: {
       kind: 'kitten', defeatable: false, scareable: true,
       homes: [[-2.5, -10], [-15, -18], [-11, 24], [6, -12], [7, 14], [-2.5, 31], [19.5, -8], [-18, 34]],

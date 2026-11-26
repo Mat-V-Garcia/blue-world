@@ -47,7 +47,8 @@ function buildTerrain(sandTex) {
 
 // ---------- Sky ----------
 
-export async function build(scene) {
+// inverted: the colour-flipped second visit, with the pebbles in new places
+export async function build(scene, { inverted = false } = {}) {
   setGround({ height: terrainHeight, radius: 92 });
   const [sandTex, rockTex, skyTex] = await Promise.all([
     loadTexture('sand.jpg'), loadTexture('rock.jpg'), loadTexture('sky.jpg'),
@@ -281,7 +282,7 @@ export async function build(scene) {
   };
   const midPost = fencePosts[Math.floor(fencePosts.length / 6)];
   const wagonInside = { x: wagon.x, z: wagon.z };
-  const pebbleSpots = [
+  const regularSpots = [
     { x: 6, z: -4, y: terrainHeight(6, -4) + 0.6, hint: 'An easy one!' },
     { x: -14, z: -10, y: surfaceTop(-14, -10) + 0.6, hint: 'On a boulder' },
     { x: midPost.x, z: midPost.z, y: midPost.top + 0.55, hint: 'Fence post!' },
@@ -293,6 +294,22 @@ export async function build(scene) {
     { x: -36.5, z: -16.5, y: terrainHeight(-36.5, -16.5) + 0.6, hint: 'Hidden in the cacti' },
     { x: -22, z: -28, y: surfaceTop(-22, -28) + 0.6, hint: 'Top of the hoodoo' },
   ];
+  // The inverted level: ten different places, reached the same ways as the ones above.
+  const farPost = fencePosts[fencePosts.length - 4]; // middle of the east fence
+  const riverX = -40;
+  const invertedSpots = [
+    { x: -4, z: 5, y: terrainHeight(-4, 5) + 0.6, hint: 'An easy one!' },
+    { x: 12, z: 8, y: surfaceTop(12, 8) + 0.6, hint: 'On a boulder' },
+    { x: -8, z: 30, y: surfaceTop(-8, 30) + 0.6, hint: 'Big boulder' },
+    { x: farPost.x, z: farPost.z, y: farPost.top + 0.55, hint: 'East fence post!' },
+    { x: -30, z: 60, y: surfaceTop(-30, 60) + 0.6, hint: 'The lonely boulder' },
+    { x: arch.x, z: arch.z, y: terrainHeight(arch.x, arch.z) + 0.6, hint: 'Under the arch' },
+    { x: riverX, z: riverZ(riverX), y: terrainHeight(riverX, riverZ(riverX)) + 0.6, hint: 'Far down the riverbed' },
+    { x: 55, z: -50, y: surfaceTop(55, -50) + 0.8, hint: 'The far mesa!' },
+    { x: -60, z: -40, y: surfaceTop(-60, -40) + 0.8, hint: 'The little mesa' },
+    { x: 60, z: 10, y: surfaceTop(60, 10) + 0.6, hint: 'Boulder out east' },
+  ];
+  const pebbleSpots = inverted ? invertedSpots : regularSpots;
 
 
   // Sagebrush clumps + small rocks: solid obstacles you walk (or jump) around, not climb.
@@ -345,8 +362,6 @@ export async function build(scene) {
     solids,
     horizonColor,
     pebbleSpots,
-    // straight ahead of where the lizard starts (the start area is kept clear of bushes and rocks)
-    portal: { x: 3.4, z: 3.4, yaw: Math.PI * 0.25 },
     update(dt, t) {
       for (const tw of tumbleweeds) {
         tw.position.x += tw.userData.speed * dt;

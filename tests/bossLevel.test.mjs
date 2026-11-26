@@ -17,9 +17,9 @@ test('boulders are low cover, clear of the middle and of the start', () => {
     assert.ok(Math.hypot(b.x, b.z + 32) >= 8);
   }
 });
-test('every level is followed by its boss: tarantula, falcon, mama cat', () => {
-  assert.equal(LEVELS.length, 6);
-  assert.deepEqual(LEVELS.map((l) => !!l.boss), [false, true, false, true, false, true]);
+test('every level is followed by its boss: tarantula, falcon, mama cat, then the same again inverted', () => {
+  assert.equal(LEVELS.length, 12);
+  assert.deepEqual(LEVELS.map((l) => !!l.boss), [false, true, false, true, false, true, false, true, false, true, false, true]);
   for (const l of LEVELS.filter((x) => x.boss)) assert.ok(l.icon);
 });
 

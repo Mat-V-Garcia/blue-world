@@ -3,12 +3,12 @@ import { terrainHeight, footprint, clampToWorld } from './world.js';
 import { toon } from './materials.js';
 
 // ---------- Tuning ----------
-const COUNT = 6;
+export const COUNT = 6;
 const SPIDER_RADIUS = 0.45;    // body radius for touching / stomping
 const SPIDER_HEIGHT = 0.42;
 const WANDER_SPEED = 1.4;
-const CHASE_SPEED = 3.8;       // slower than the lizard's walk (5.5), so you can always escape
-const NOTICE_RANGE = 8.5;      // starts chasing inside this
+export const CHASE_SPEED = 3.8;       // slower than the lizard's walk (5.5), so you can always escape
+export const NOTICE_RANGE = 8.5;      // starts chasing inside this
 const GIVE_UP_RANGE = 15;      // stops chasing past this (from home)
 const RESPAWN_TIME = 30;       // seconds after being defeated
 const BITE_RANGE = 1.35;       // how far in front of the lizard a bite reaches

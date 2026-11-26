@@ -161,3 +161,13 @@ test('reset puts it back on its perch at full health', () => {
   assert.equal(b.state, 'hidden'); assert.equal(b.health, 6);
   assert.deepEqual([b.pos.x, b.pos.y, b.pos.z], [-20, 30, 20]);
 });
+
+test('tune overrides the falcon\'s numbers (the inverted level uses this)', async () => {
+  const { createFalcon, FALCON } = await import('../src/falcon.js');
+  const THREE = await import('three');
+  const model = () => ({ root: new THREE.Group(), update() {} });
+  const f = createFalcon(new THREE.Scene(), [], model, { perch: { x: 0, y: 12, z: 0 }, health: 8, tune: { BODY_R: 3 } });
+  assert.equal(f.bodyR, 3);
+  assert.equal(f.maxHealth, 8);
+  assert.equal(createFalcon(new THREE.Scene(), [], model, {}).bodyR, FALCON.BODY_R);
+});

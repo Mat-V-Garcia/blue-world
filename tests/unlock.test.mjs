@@ -58,10 +58,39 @@ test('asking for the boss by address falls back to Level 3 until it is unlocked'
 // the highest level id open, so old saves shift up by one to keep the same levels open.
 import { LEVELS, levelLabel } from '../src/levels/index.js';
 
-test('level order: the boss comes straight after the desert', () => {
-  assert.deepEqual(LEVELS.map((l) => l.name), ['The Desert', 'The Giant Tarantula', 'Fullerton Shops', 'The Peregrine Falcon', 'The Back Yard', 'Mama Cat']);
-  assert.deepEqual(LEVELS.map((l) => l.id), [1, 2, 3, 4, 5, 6]);
-  assert.deepEqual(LEVELS.map(levelLabel), ['Level 1', 'Boss', 'Level 2', 'Boss', 'Level 3', 'Boss']);
+test('level order: the six regular levels, then the same six inverted', () => {
+  assert.deepEqual(LEVELS.map((l) => l.name), [
+    'The Desert', 'The Giant Tarantula', 'Fullerton Shops', 'The Peregrine Falcon', 'The Back Yard', 'Mama Cat',
+    'Inverted Desert', 'Inverted Giant Tarantula', 'Inverted Fullerton Shops', 'Inverted Peregrine Falcon', 'Inverted Back Yard', 'Inverted Mama Cat',
+  ]);
+  assert.deepEqual(LEVELS.map((l) => l.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  assert.deepEqual(LEVELS.map(levelLabel), ['Level 1', 'Boss', 'Level 2', 'Boss', 'Level 3', 'Boss', 'Level 4', 'Boss', 'Level 5', 'Boss', 'Level 6', 'Boss']);
+  assert.deepEqual(LEVELS.map((l) => !!l.inverted), [false, false, false, false, false, false, true, true, true, true, true, true]);
+});
+
+test('each inverted level is its regular level again: same place, same kind, its own story', () => {
+  for (let i = 0; i < 6; i++) {
+    const a = LEVELS[i], b = LEVELS[i + 6];
+    assert.equal(b.load, a.load);
+    assert.equal(!!b.boss, !!a.boss);
+    assert.notEqual(b.intro, a.intro);
+    assert.ok(b.intro.length > 40);
+  }
+});
+
+test('the inverted levels stay locked until Mama Cat is beaten', async () => {
+  assert.equal(await withBrowser(6, '?level=7', (m) => m.currentLevelId()), 6); // Mama Cat open, not beaten
+  assert.equal(await withBrowser(7, '?level=7', (m) => m.currentLevelId()), 7);
+  assert.equal(await withBrowser(12, '?level=12', (m) => m.currentLevelId()), 12);
+  assert.equal(await withBrowser(12, '?level=99', (m) => m.currentLevelId()), 12);
+});
+
+test('progress saved before the inverted levels existed is left as it is', () => {
+  for (const n of [1, 3, 5, 6]) {
+    const s = store({ 'blueworld.unlocked': String(n), 'blueworld.l3open': '1', 'blueworld.bossSecond': '1', 'blueworld.falconFourth': '1' });
+    migrateUnlocks(s);
+    assert.equal(s.m.get('blueworld.unlocked'), String(n));
+  }
 });
 
 test('old saves keep the levels they had open after the re-order, once', () => {

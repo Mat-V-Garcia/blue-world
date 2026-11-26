@@ -18,8 +18,9 @@ export const FALCON = {
 
 // makeModel(): { root, update(dt, speed, mode) } (the falcon model, or the simple stand-in).
 // cfg: { perch: {x, y, z}, health?, scale?, yaw? }  It sits on its perch until emerge().
+//   tune?: overrides for the numbers in FALCON
 export function createFalcon(scene, colliders, makeModel, cfg = {}) {
-  const B = FALCON;
+  const B = { ...FALCON, ...cfg.tune };
   const v = makeModel();
   const rig = new THREE.Group(), tilt = new THREE.Group();
   v.root.scale.setScalar(cfg.scale ?? 1);
@@ -37,6 +38,7 @@ export function createFalcon(scene, colliders, makeModel, cfg = {}) {
   const boss = {
     pos: new THREE.Vector3(), yaw: 0, health: 0, maxHealth: cfg.health ?? B.HEALTH,
     state: 'hidden', bodyR: B.BODY_R, rig,
+    ring, // (main.js keeps it red in the inverted level)
   };
   let timer = 0, orbit = 0, speed = 0, bait = null, pendingWindup = false;
   const tgt = new THREE.Vector3(), dir = new THREE.Vector3(), tmp = new THREE.Vector3();

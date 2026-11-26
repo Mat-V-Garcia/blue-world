@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { terrainHeight, footprint } from './world.js';
 import { LEVELS, levelLabel, currentLevelId, unlockedLevel, unlockLevel, migrateUnlocks } from './levels/index.js';
+import { harder } from './levels/inverted.js';
 import { loadKittenModel, createSimpleKitten } from './kittenModel.js';
 import { loadPigeonModel, createSimplePigeon } from './pigeonModel.js';
 import { createLizard } from './lizard.js';
@@ -18,7 +19,7 @@ import { createMamaCat } from './mamaCat.js';
 import { loadMamaCatModel } from './mamaCatModel.js';
 import { createFalcon } from './falcon.js';
 import { createStorm, stormLevel } from './storm.js';
-import { createPortal, createFlip, createRedSkin } from './portal.js';
+import { createFlip, createRedSkin } from './flip.js';
 
 const TOTAL = 10;
 const $ = (id) => document.getElementById(id);
@@ -36,11 +37,12 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 
 const scene = new THREE.Scene();
-const flip = createFlip(renderer); // the colour-flipped world on the far side of a portal
-const redSkin = createRedSkin();   // ...where the enemies turn red and black
+const flip = createFlip(renderer); // the inverted levels: every colour flipped
+const redSkin = createRedSkin();   // ...where the enemies and the boss turn red and black
 function setFlipped(on) {
   flip.on = on;
   tarantulas?.spiders.forEach((s) => redSkin.apply(s.v.root, on));
+  if (boss) redSkin.apply(boss.rig, on);
 }
 // Clear midday air: pale blue haze, pushed far out (colour replaced by the painted sky's horizon)
 scene.fog = new THREE.Fog(0xcfe3f2, 70, 260);
@@ -136,7 +138,6 @@ let world, player, lizard, pebbles, dust, tarantulas, tail;
 let collected = 0;
 // Boss level only: the giant tarantula, the storm it brings, and bits of web
 let boss = null, storm = null, stuckTold = false, strands = null;
-let portal = null; // a level can have a portal: walking through it flips the world's colours
 const splats = [];
 // Health: 5 hearts. A touch costs one; they refill slowly if you stay out of trouble.
 const MAX_HEARTS = 5, INVULN_TIME = 1.6, REGEN_DELAY = 8, REGEN_EVERY = 10;
@@ -163,7 +164,8 @@ const ENEMY_MODELS = {
 async function init() {
   setupTitle();
   const levelModule = await LEVEL.load();
-  world = await levelModule.build(scene);
+  world = await levelModule.build(scene, { inverted: !!LEVEL.inverted });
+  if (LEVEL.inverted) world = harder(world); // faster, sharper enemies and a tougher boss
   if (world.horizonColor) scene.fog.color.copy(world.horizonColor);
   try {
     lizard = await createLizardModel();
@@ -210,9 +212,12 @@ async function init() {
     strands.position.y = 0.2; strands.scale.z = 1.7; strands.visible = false;
     lizard.root.add(strands);
   }
-  if (world.portal) portal = createPortal(scene, world.portal, terrainHeight(world.portal.x, world.portal.z));
   flip.markUnflipped(scene, lizard.root); // the lizard keeps its own colours
   tarantulas.spiders.forEach((s) => flip.markUnflipped(scene, s.v.root)); // enemies go red and black instead
+  if (boss) {
+    flip.markUnflipped(scene, boss.rig); // ...and so does the boss
+    if (world.boss.kind === 'falcon' && boss.ring) flip.markUnflipped(scene, boss.ring); // its dive ring stays red
+  }
   reset();
   state = 'title';
   renderer.setAnimationLoop(loop);
@@ -242,8 +247,7 @@ function reset() {
   boss?.reset();
   storm?.reset();
   stuckTold = false;
-  setFlipped(false);
-  portal?.reset();
+  setFlipped(!!LEVEL.inverted); // the inverted levels are colour-flipped from start to finish
   drawBoss();
 }
 
@@ -328,12 +332,17 @@ function setupTitle() {
   $('help').textContent = LEVEL.help;
   $('help-touch').textContent = LEVEL.helpTouch;
   document.querySelector('#title .art').style.backgroundImage = `url('${LEVEL.title}')`;
+  document.querySelector('#title .art').classList.toggle('inverted', !!LEVEL.inverted); // the picture flips too
   const open = unlockedLevel();
-  $('levels').innerHTML = LEVELS.map((l) => {
+  const button = (l) => {
     const locked = l.id > open, here = l.id === LEVEL_ID;
-    return `<button class="lvl${here ? ' here' : ''}" data-id="${l.id}" ${locked ? 'disabled' : ''}>`
+    return `<button class="lvl${here ? ' here' : ''}${l.inverted ? ' inv' : ''}" data-id="${l.id}" ${locked ? 'disabled' : ''}>`
       + `${locked ? '🔒' : l.boss ? l.icon : levelLabel(l).slice(6)} <span>${l.name}</span></button>`;
-  }).join('');
+  };
+  // two rows: the regular levels, then the inverted ones under their own heading
+  $('levels').innerHTML = `<div class="row">${LEVELS.filter((l) => !l.inverted).map(button).join('')}</div>`
+    + `<div class="row-title">Inverted World${open > LEVELS.length / 2 ? '' : ' · beat Mama Cat to open it'}</div>`
+    + `<div class="row">${LEVELS.filter((l) => l.inverted).map(button).join('')}</div>`;
   $('levels').querySelectorAll('button:not([disabled])').forEach((b) => {
     b.onclick = () => { if (Number(b.dataset.id) !== LEVEL_ID) goToLevel(Number(b.dataset.id), false); };
   });
@@ -533,13 +542,6 @@ function frame(dt) {
 
   // world + pebbles
   world.update(dt, t);
-  if (portal?.update(dt, t, player.pos) && playing) {
-    setFlipped(!flip.on);
-    sfx.portal();
-    toast(flip.on ? 'Whoa! Flipped world!' : 'Back to normal');
-    $('flash').classList.add('show');
-    setTimeout(() => $('flash').classList.remove('show'), 160);
-  }
   dust.update(dt);
   const got = pebbles.update(dt, t, new THREE.Vector3(player.pos.x, player.pos.y + 0.25, player.pos.z));
   if (got && playing) {
@@ -618,4 +620,4 @@ function frame(dt) {
 
 init();
 // handy for debugging / testing in the console
-window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = v; }, set camPitch(v) { camPitch = v; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, get boss() { return boss; }, get storm() { return storm; }, get portal() { return portal; }, get flip() { return flip; }, setFlipped, start, frame };
+window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = v; }, set camPitch(v) { camPitch = v; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, get boss() { return boss; }, get storm() { return storm; }, get flip() { return flip; }, setFlipped, start, frame };

@@ -46,7 +46,8 @@ function wireTexture() {
   const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 3); return t;
 }
 
-export async function build(scene) {
+// inverted: the colour-flipped second visit, with the pebbles in new places
+export async function build(scene, { inverted = false } = {}) {
   setGround({ height: groundHeight, radius: RADIUS });
   const [asphaltTex, sidewalkTex, stuccoTex, shops1, shops2, skyTex] = await Promise.all([
     loadTexture('asphalt.jpg'), loadTexture('sidewalk.jpg'), loadTexture('stucco.jpg'),
@@ -195,7 +196,7 @@ export async function build(scene) {
     return base + h + 0.95;
   };
   const palmTop = palm(-40, 30, 18);
-  palm(-4, 30, 16); palm(8, 6, 17); palm(-54, -20, 15); palm(-54, 6, 18);
+  palm(-4, 30, 16); const palmTop2 = palm(8, 6, 17); palm(-54, -20, 15); palm(-54, 6, 18);
 
   // ---------- Orange tree (Fullerton's citrus history) ----------
   const OX = -32, OZ = 4;
@@ -360,7 +361,7 @@ export async function build(scene) {
     return t;
   };
   const car0 = cars[2], car1 = cars[8];
-  const pebbleSpots = [
+  const regularSpots = [
     { x: -30, z: 26, y: groundHeight(-30, 26) + 0.55, hint: 'Under the bench!' },
     { x: FX, z: FZ, y: FTOP + 0.6, hint: 'Top of the fountain' },
     { x: -27, z: 31, y: cartTops[2] + 0.6, hint: 'In a shopping cart' },
@@ -372,7 +373,22 @@ export async function build(scene) {
     { x: -40, z: 30, y: palmTop + 0.6, hint: 'Top of a palm tree!' },
     { x: -20, z: 50, y: SH + 0.6, hint: 'On the shop roof' },
   ];
-  void benchTop; void top;
+  // The inverted level: ten different places, reached the same ways as the ones above.
+  const car2 = cars[11], car3 = cars[4];
+  const invertedSpots = [
+    { x: 4, z: -6, y: cartTops[0] + 0.6, hint: 'In a shopping cart' },
+    { x: -4, z: 22, y: benchTop + 0.6, hint: 'On the bench' },
+    { x: -16, z: 2, y: groundHeight(-16, 2) + 10.9 + 0.6, hint: 'Top of a lamp post!' },
+    { x: car2.x, z: car2.z - 0.6, y: 5.0 + 0.6, hint: 'Car roof!' },
+    { x: car3.x, z: car3.z, y: 0.5, hint: 'Hiding under a car' },
+    { x: -24, z: 38, y: umbrellaTop + 0.6, hint: 'On the blue umbrella' },
+    { x: 8, z: 6, y: palmTop2 + 0.6, hint: 'Top of a palm tree!' },
+    { x: 0, z: 56, y: SH + 0.6, hint: 'Far end of the shop roof' },
+    { x: -52, z: -8, y: groundHeight(-52, -8) + 0.6, hint: 'Along the west walk' },
+    { x: -12.7, z: 38, y: groundHeight(-12.7, 38) + 2.55 + 0.6, hint: 'On a café table' },
+  ];
+  const pebbleSpots = inverted ? invertedSpots : regularSpots;
+  void top;
 
   return {
     colliders,
@@ -381,7 +397,6 @@ export async function build(scene) {
     sky,
     pebbleSpots,
     spawn: { x: 2, z: -2, yaw: Math.PI * 0.85 }, // looking into the plaza
-    portal: { x: -0.5, z: -8, yaw: Math.PI * 1.125 }, // just ahead of the start, in a clear patch of the car park
     enemies: {
       kind: 'pigeon',
       homes: [[-26, 22], [-8, 12], [14, -28], [22, -26], [-26, -12], [32, 6], [-50, 24], [44, -30]],
