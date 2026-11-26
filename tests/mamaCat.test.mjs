@@ -467,3 +467,32 @@ test('DOUBLE: at full health a missed pounce is followed by a second before she 
   until(b, p, (e) => { assert.notEqual(e.windupNow, 'pounce', 'two, not three'); return e.stuckNow; }, 3);
   assert.equal(b.state, 'flop');
 });
+
+// ---------- easy to land on ----------
+const flopped = () => { const p = liz(0, 10), b = make(p); flopHer(b, p); b.update(DT, p, true); return [b, p]; };
+const at = (b, p, off, y, velY, onGround = false) => { p.pos.set(b.pos.x + off, y, b.pos.z); p.velY = velY; p.onGround = onGround; return b.update(DT, p, true); };
+test('landing anywhere along her body counts, not only on her middle', () => {
+  const [b, p] = flopped();
+  assert.equal(at(b, p, 3.0, 0.9, -3).hit, true);  // out by her head or her tail
+  const [b2, p2] = flopped();
+  assert.equal(at(b2, p2, CAT.HIT_R + 0.3, 0.9, -3).hit, false); // past the end of her
+});
+test('a jump counts on the way up as well as on the way down, low or high', () => {
+  for (const [y, velY] of [[0.5, 6], [0.25, -6], [2.5, -1]]) {
+    const [b, p] = flopped();
+    assert.equal(at(b, p, 1, y, velY).hit, true, `at height ${y}, speed ${velY}`);
+  }
+});
+test('walking into her while she is down, or standing on her, is still not a hit', () => {
+  const [b, p] = flopped();
+  assert.equal(at(b, p, 1, 0, 0, true).hit, false);
+  assert.equal(at(b, p, 1, 1.0, 0, true).hit, false);
+  assert.equal(b.health, 6);
+});
+test('one jump is one hit: she gets up at once', () => {
+  const [b, p] = flopped();
+  assert.equal(at(b, p, 1, 0.5, 6).hit, true);
+  assert.equal(b.state, 'recover');
+  assert.equal(at(b, p, 1, 0.9, -3).hit, false);
+  assert.equal(b.health, 5);
+});

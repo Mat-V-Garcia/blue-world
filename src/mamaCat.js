@@ -19,6 +19,10 @@ export const CAT = {
   REACH_UP: 4,                      // a lizard perched lower than this can still be swiped
   // measured on the model at scale 6.5: 6.5 long, 2.6 wide, back 3.0 up (1.5 when she lies on her side)
   BODY_R: 2.2, BACK_UP: 3.0, BACK_FLOP: 1.0,
+  // Landing on her while she is flopped or playing. Generous on purpose: anywhere along her
+  // body counts (HIT_R is half her length), from just off the ground (HIT_LOW) to well above
+  // her (HIT_HIGH), and on the way up as well as on the way down.
+  HIT_R: 3.3, HIT_LOW: 0.2, HIT_HIGH: 2.6,
   SLEEPY_BELOW: 0.5, YAWN: 1.0, EMERGE: 1.5,
   DOUBLE: false,                    // true: every missed pounce is followed by a second, not only when she is sleepy
 };
@@ -246,9 +250,11 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     // --- the lizard touching her or landing on her ---
     const s = cat.state, up = player.pos.y - cat.pos.y;
     const onFeet = s === 'stalk' || s === 'swipeWind' || s === 'swipe' || s === 'crouch' || s === 'yawn';
-    if (d < C.BODY_R && !ev.caught && !ev.bounced) {
-      if (s === 'flop' || s === 'play') {
-        if (player.velY < 0 && up >= 0.4 && up <= C.BACK_FLOP + 1 && !ev.stuckNow) {
+    const down = s === 'flop' || s === 'play';
+    const airborne = player.velY < 0 || (player.onGround === false && player.velY > 0);
+    if (d < (down ? C.HIT_R : C.BODY_R) && !ev.caught && !ev.bounced) {
+      if (down) {
+        if (airborne && up >= C.HIT_LOW && up <= C.HIT_HIGH && !ev.stuckNow) {
           ev.hit = true; cat.health -= 1;
           if (cat.health <= 0) { cat.health = 0; cat.state = 'defeated'; ev.defeated = true; ring.visible = false; }
           else { cat.state = 'recover'; timer = C.RECOVER; }
