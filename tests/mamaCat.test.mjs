@@ -395,3 +395,29 @@ test('she walks under a high roof (the gazebo) instead of being stopped by it', 
   assert.ok(b.pos.z > 9, `went under it (z ${b.pos.z.toFixed(1)})`);
   assert.ok(Math.abs(b.pos.x) < 1, 'in a straight line');
 });
+
+// ---------- found in review ----------
+const wall = (x, z, hx, hz) => ({ type: 'box', x, z, hx, hz, angle: 0, bottom: -100, top: 3 });
+test('a dead end between her and a far lizard does not hold her: she finds a way or hops over, without flopping', () => {
+  // a U-shaped pocket open towards her, the lizard well beyond it
+  const cols = [wall(0, 12, 10, 0.5), wall(-10, 8, 0.5, 4.5), wall(10, 8, 0.5, 4.5)];
+  const p = liz(0, 34), b = make(p, cols);
+  const e = until(b, p, (ev) => { assert.equal(ev.stuckNow, false, 'getting unstuck is not an opening'); return ev.caught; }, 60);
+  assert.ok(e.caught.isVector3, 'she reached the lizard');
+});
+test('a hop over furniture towards a hidden lizard does not hurt it', () => {
+  const cols = [wall(0, 12, 10, 0.5), wall(-10, 8, 0.5, 4.5), wall(10, 8, 0.5, 4.5), table(0, 24)];
+  const p = liz(0, 24), b = make(p, cols);
+  until(b, p, (ev) => { assert.equal(ev.caught, null); assert.equal(ev.stuckNow, false); return ev.windupNow === 'fish'; }, 60);
+});
+test('swipe: a lizard clinging to a wall within her reach is hit, even if it jumped on', () => {
+  const p = liz(0, 4), b = windUp(p);
+  p.pos.y = 3; p.onGround = false; p.climbing = true;
+  until(b, p, (ev) => ev.caught, 1.5);
+});
+test('tail: one dropped on a perch out of her reach is ignored', () => {
+  const p = liz(0, 30), b = make(p);
+  assert.equal(b.baitWith(new THREE.Vector3(8, CAT.REACH_UP + 2, 0)), false);
+  assert.equal(b.state, 'stalk');
+  assert.equal(b.baitWith(new THREE.Vector3(8, CAT.REACH_UP - 1, 0)), true);
+});

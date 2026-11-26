@@ -50,6 +50,9 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
   let grace = 0;                             // just got up: her side can't hurt for this long
   const from = new THREE.Vector2(), target = new THREE.Vector2();
   let bait = null;                           // the dropped tail she is after
+  // getting round furniture: which way she slides along it, and how long she has gone nowhere
+  let slide = 1, stuckT = 0, tries = 0, nearest = Infinity, hop = false; // hop: a short leap over what blocks her (no flop after it)
+  const anchor = new THREE.Vector2();        // where the lizard was at the last check
   let pose = { roll: 0, sy: 1 };
 
   const sleepy = () => cat.health / cat.maxHealth < C.SLEEPY_BELOW;
@@ -73,15 +76,28 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
       if (c.top <= g + 0.5 || c.bottom >= g + C.BACK_UP + 1.5) continue; // low enough to step over, or a roof above her ears
       const f = footprint(c, nx, nz, g + 0.3);
       if (f.dist < C.BODY_R) {
-        nx += f.nx * (C.BODY_R - f.dist) - f.nz * len * 0.6;
-        nz += f.nz * (C.BODY_R - f.dist) + f.nx * len * 0.6;
+        nx += f.nx * (C.BODY_R - f.dist) - f.nz * len * 0.6 * slide;
+        nz += f.nz * (C.BODY_R - f.dist) + f.nx * len * 0.6 * slide;
       }
     }
     [nx, nz] = clampToWorld(nx, nz, C.BODY_R);
     speed = Math.hypot(nx - cat.pos.x, nz - cat.pos.z) / Math.max(dt, 1e-4);
     cat.pos.x = nx; cat.pos.z = nz;
   }
-  const stalk = (pause = 0) => { cat.state = 'stalk'; rest = pause; stalkT = 0; ring.visible = false; };
+  const stalk = (pause = 0) => { cat.state = 'stalk'; rest = pause; stalkT = 0; ring.visible = false; stuckT = 0; tries = 0; nearest = Infinity; };
+  // Walking after the lizard. If a second and a half of it brings her no nearer to a lizard
+  // that is staying put, she is caught on the furniture: first she tries sliding round it
+  // the other way, and if that is no better she hops over it.
+  function walk(ux, uz, pace, dt, px, pz) {
+    step(ux, uz, pace, dt);
+    stuckT += dt;
+    if (stuckT < 1.5) return;
+    const d = Math.hypot(px - cat.pos.x, pz - cat.pos.z), ran = Math.hypot(px - anchor.x, pz - anchor.y);
+    stuckT = 0; anchor.set(px, pz);
+    if (d < nearest - 0.5 || ran > 2) { nearest = Math.min(nearest, d); if (ran > 2) nearest = d; tries = 0; return; }
+    if (++tries === 1) { slide = -slide; return; }
+    tries = 0; nearest = Infinity; hop = true; crouch(px, pz, C.CROUCH * 0.6);
+  }
   // getting up with the lizard still on or under her: it is tipped off, not hurt
   const getUp = (ev, player, pause = 0) => {
     if (Math.hypot(player.pos.x - cat.pos.x, player.pos.z - cat.pos.z) < C.BODY_R) ev.bounced = true;
@@ -90,7 +106,8 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
   // crouch facing the lizard; the leap goes to where it is now (never further than she can jump, never out of the yard)
   function crouch(px, pz, secs) {
     let dx = px - cat.pos.x, dz = pz - cat.pos.z;
-    const d = Math.hypot(dx, dz) || 1e-6, k = Math.min(1, C.POUNCE_MAX / d);
+    const d = Math.hypot(dx, dz) || 1e-6;
+    const k = Math.min(1, (hop ? Math.min(C.POUNCE_MAX, Math.max(0, d - C.SWIPE_RANGE)) : C.POUNCE_MAX) / d); // a hop stops short of the lizard
     const [tx, tz] = clampToWorld(cat.pos.x + dx * k, cat.pos.z + dz * k, C.BODY_R);
     target.set(tx, tz);
     cat.yaw = Math.atan2(dx, dz);
@@ -103,6 +120,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     cat.yaw = 0; cat.health = cat.maxHealth; cat.state = 'hidden';
     timer = 0; rest = 0; speed = 0; stalkT = 0; pending = null;
     pounceCD = 0; air = 0; second = false; grace = 0; bait = null;
+    slide = 1; stuckT = 0; tries = 0; nearest = Infinity; hop = false;
     pose = { roll: 0, sy: 1 };
     rig.visible = false; ring.visible = false;
   }
@@ -121,7 +139,8 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     const s = cat.state;
     if (s !== 'stalk' && s !== 'swipeWind' && s !== 'crouch' && s !== 'yawn' && s !== 'fish') return false;
     if (Math.hypot(pos.x - cat.pos.x, pos.z - cat.pos.z) > C.TAIL_RANGE) return false;
-    bait = pos.clone(); cat.state = 'trot'; timer = 4; pending = null; ring.visible = false;
+    if (pos.y - terrainHeight(pos.x, pos.z) >= C.REACH_UP) return false; // up on a perch where she can't get at it
+    bait = pos.clone(); cat.state = 'trot'; timer = 4; pending = null; ring.visible = false; hop = false;
     return true;
   };
 
@@ -144,15 +163,15 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
       else if (hid) {
         // it is under the furniture: walk over, lie down and fish for it
         if (d <= C.FISH_DIST + C.BODY_R) { cat.state = 'fish'; timer = C.FISH_TIME; pending = 'fish'; }
-        else step(dx / d, dz / d, C.STALK, dt);
+        else walk(dx / d, dz / d, C.STALK, dt, px, pz);
       } else if (high >= C.REACH_UP) {
         // out of reach: sit below and wait
-        if (d > C.CIRCLE_R - 1) step(dx / d, dz / d, C.STALK, dt);
+        if (d > C.CIRCLE_R - 1) walk(dx / d, dz / d, C.STALK, dt, px, pz);
       } else if (d <= C.SWIPE_RANGE) {
         cat.state = 'swipeWind'; timer = C.SWIPE_WINDUP; pending = 'swipe';
         cat.yaw = Math.atan2(dx, dz); // the paw goes where she is looking now
       } else if (pounceCD <= 0 && d >= C.POUNCE_MIN && d <= C.POUNCE_MAX && high < 1) {
-        second = false;
+        second = false; hop = false;
         if (sleepy()) { cat.state = 'yawn'; timer = C.YAWN; ev.yawnNow = true; } else crouch(px, pz, C.CROUCH);
       } else {
         // a circle round the lizard that tightens until she is close enough to swipe
@@ -160,7 +179,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
         const inward = Math.max(-1, Math.min(1, d - R)), round = d < C.CIRCLE_R + 2 ? 0.6 : 0;
         const ux = (dx / d) * inward - (dz / d) * round, uz = (dz / d) * inward + (dx / d) * round;
         const n = Math.hypot(ux, uz) || 1;
-        step(ux / n, uz / n, d > C.POUNCE_MAX + 4 ? C.TROT : C.STALK, dt); // she trots to catch up from right across the yard
+        walk(ux / n, uz / n, d > C.POUNCE_MAX + 4 ? C.TROT : C.STALK, dt, px, pz); // she trots to catch up from right across the yard
       }
     } else if (cat.state === 'swipeWind') {
       timer -= dt;
@@ -168,7 +187,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     } else if (cat.state === 'swipe') {
       let a = Math.atan2(dx, dz) - cat.yaw;
       a = Math.abs(Math.atan2(Math.sin(a), Math.cos(a)));
-      const jumped = player.onGround === false && high >= C.SWIPE_CLEAR;
+      const jumped = !player.climbing && player.onGround === false && high >= C.SWIPE_CLEAR; // clinging to a wall is not a jump
       if (canHurt && d <= C.SWIPE_REACH && a <= C.SWIPE_ARC && !jumped && high < C.REACH_UP) {
         ev.caught = cat.pos.clone(); stalk(REST);
       } else {
@@ -180,7 +199,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
       if (timer <= 0) crouch(px, pz, C.CROUCH);
     } else if (cat.state === 'crouch') {
       timer -= dt;
-      if (hid) stalk();
+      if (hid && !hop) stalk();
       else if (timer <= 0) { cat.state = 'pounce'; air = 0; from.set(cat.pos.x, cat.pos.z); }
     } else if (cat.state === 'pounce') {
       air = Math.min(1, air + dt / C.AIR);
@@ -189,7 +208,8 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
       if (air >= 1) {
         air = 0; ring.visible = false; pounceCD = C.POUNCE_CD;
         dx = px - cat.pos.x; dz = pz - cat.pos.z; d = Math.hypot(dx, dz) || 1e-6;
-        if (canHurt && d < C.LAND_R && high < C.BACK_UP - 0.6) { ev.caught = cat.pos.clone(); stalk(REST); }
+        if (canHurt && d < C.LAND_R && high < C.BACK_UP - 0.6 && !hid) { ev.caught = cat.pos.clone(); hop = false; stalk(REST); }
+        else if (hop) { hop = false; stalk(0.5); } // only getting over the furniture: she lands on her feet
         else if (sleepy() && !second) { second = true; crouch(px, pz, C.CROUCH * 0.6); } // sleepy and wild: straight into another
         else { cat.state = 'flop'; timer = C.FLOP; ev.stuckNow = true; }
       }
@@ -229,7 +249,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
         }
       } else if (onFeet) {
         if (player.velY < 0 && Math.abs(up - C.BACK_UP) <= 0.6) ev.bounced = true;
-        else if (up < C.BACK_UP - 0.6 && canHurt && grace <= 0) { ev.caught = cat.pos.clone(); stalk(REST); }
+        else if (up < C.BACK_UP - 0.6 && canHurt && grace <= 0 && !hid) { ev.caught = cat.pos.clone(); stalk(REST); }
       }
     }
 
