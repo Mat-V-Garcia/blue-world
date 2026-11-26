@@ -251,3 +251,119 @@ test('sixth hit: asleep where she is, still in view, ring hidden', () => {
   p.pos.set(b.pos.x + 1, 0, b.pos.z);
   assert.equal(b.update(DT, p, true).caught, null, 'a sleeping cat is harmless');
 });
+
+// ---------- tail play ----------
+const tailAt = (x, z) => new THREE.Vector3(x, 0, z);
+test('tail: she trots to a dropped tail in range and plays with it for 3.0 s, then stalks again', () => {
+  const p = liz(0, 30), b = make(p);
+  assert.equal(b.baitWith(tailAt(8, 0)), true);
+  assert.equal(b.state, 'trot');
+  until(b, p, (_e, bb) => bb.state === 'play', 4);
+  assert.ok(Math.hypot(b.pos.x - 8, b.pos.z) < CAT.BODY_R + 1, 'beside the tail');
+  run(b, p, CAT.PLAY - 0.1);
+  assert.equal(b.state, 'play');
+  run(b, p, 0.2);
+  assert.equal(b.state, 'stalk');
+});
+test('tail: landing on her back while she plays is a hit', () => {
+  const p = liz(0, 30), b = make(p);
+  b.baitWith(tailAt(8, 0));
+  until(b, p, (_e, bb) => bb.state === 'play', 4);
+  const e = land(b, p);
+  assert.equal(e.hit, true);
+  assert.equal(b.health, CAT.HEALTH - 1);
+  assert.equal(b.state, 'recover');
+});
+test('tail: standing beside her while she plays does not hurt', () => {
+  const p = liz(0, 30), b = make(p);
+  b.baitWith(tailAt(8, 0));
+  until(b, p, (_e, bb) => bb.state === 'play', 4);
+  p.pos.set(b.pos.x + 1, 0, b.pos.z);
+  assert.ok(run(b, p, 1).every((e) => !e.caught));
+});
+test('tail: ignored when out of range, hidden, in the air, flopped, shaking off, or asleep', () => {
+  const h = hidden();
+  assert.equal(h.baitWith(tailAt(1, 1)), false);
+  assert.equal(h.state, 'hidden');
+  const p = liz(0, 10), b = make(p);
+  assert.equal(b.baitWith(tailAt(0, CAT.TAIL_RANGE + 1)), false);
+  assert.equal(b.state, 'stalk');
+  b.update(DT, p, true); away(p);
+  until(b, p, (_e, bb) => bb.state === 'pounce', 2);
+  assert.equal(b.baitWith(tailAt(1, 1)), false); assert.equal(b.state, 'pounce');
+  until(b, p, (e) => e.stuckNow, 2);
+  assert.equal(b.baitWith(tailAt(1, 1)), false); assert.equal(b.state, 'flop');
+  land(b, p);
+  assert.equal(b.baitWith(tailAt(1, 1)), false); assert.equal(b.state, 'recover');
+  for (let n = 0; n < 5; n++) { flopHer(b, p); land(b, p); }
+  assert.equal(b.state, 'defeated');
+  assert.equal(b.baitWith(tailAt(1, 1)), false); assert.equal(b.state, 'defeated');
+});
+test('tail: a tail dropped mid-crouch calls the pounce off and hides the ring', () => {
+  const p = liz(0, 10), b = make(p);
+  b.update(DT, p, true);
+  assert.equal(b.state, 'crouch');
+  assert.equal(b.baitWith(tailAt(3, 3)), true);
+  assert.equal(b.state, 'trot');
+  assert.equal(b.ring.visible, false);
+});
+
+// ---------- fishing under furniture ----------
+const underTable = () => { const p = liz(-14, 0); return { p, cols: [table(-14, 0)] }; };
+test('fishing: a hidden lizard brings her over to lie down and reach under', () => {
+  const { p, cols } = underTable(), b = make(p, cols);
+  const e = until(b, p, (ev) => ev.windupNow === 'fish', 20);
+  assert.equal(e.caught, null);
+  assert.equal(b.state, 'fish');
+  assert.ok(dist(b, p) <= CAT.FISH_DIST + CAT.BODY_R + 0.01, `dist ${dist(b, p)}`);
+});
+test('fishing: she never swipes or pounces at a hidden lizard on the way', () => {
+  const { p, cols } = underTable(), b = make(p, cols);
+  until(b, p, (ev, bb) => { assert.ok(!['swipeWind', 'crouch', 'pounce', 'yawn'].includes(bb.state)); assert.equal(ev.caught, null); return ev.windupNow === 'fish'; }, 20);
+});
+test('fishing: a lizard that leaves is not caught and she stalks again', () => {
+  const { p, cols } = underTable(), b = make(p, cols);
+  until(b, p, (ev) => ev.windupNow === 'fish', 20);
+  run(b, p, 1);
+  p.pos.set(-14, 0, 12);
+  const e = b.update(DT, p, true);
+  assert.equal(e.caught, null);
+  assert.equal(b.state, 'stalk');
+});
+test('fishing: a lizard still hidden after 3.0 s is batted out', () => {
+  const { p, cols } = underTable(), b = make(p, cols);
+  until(b, p, (ev) => ev.windupNow === 'fish', 20);
+  assert.ok(run(b, p, CAT.FISH_TIME - 0.1).every((e) => !e.caught));
+  const e = until(b, p, (ev) => ev.caught, 0.3);
+  assert.ok(e.caught.isVector3);
+  assert.equal(b.state, 'stalk');
+});
+
+// ---------- perches ----------
+test('perch: a lizard higher than CAT.REACH_UP is never caught and she waits below', () => {
+  const p = liz(0, 12, CAT.REACH_UP + 1); p.onGround = true;
+  const b = make(p);
+  const evs = run(b, p, 20);
+  assert.ok(evs.every((e) => !e.caught && !e.windupNow), 'no swipes or pounces at something out of reach');
+  assert.ok(dist(b, p) <= CAT.CIRCLE_R + 1, `waits close by (${dist(b, p)})`);
+  const x = b.pos.x, z = b.pos.z;
+  run(b, p, 2);
+  assert.ok(Math.hypot(b.pos.x - x, b.pos.z - z) < 0.5, 'sits still');
+});
+test('perch: a lizard on something lower than CAT.REACH_UP is swiped', () => {
+  const p = liz(0, 12, 2); p.onGround = true;
+  const b = make(p);
+  let pounced = false;
+  until(b, p, (e) => { pounced ||= e.windupNow === 'pounce'; return e.caught; }, 20);
+  assert.equal(pounced, false, 'she swipes at a perch, she does not pounce on it');
+});
+
+// ---------- restart ----------
+test('reset() during pounce, play and fish: hidden, full health, ring hidden', () => {
+  const check = (b) => { b.reset(); assert.equal(b.state, 'hidden'); assert.equal(b.health, b.maxHealth); assert.equal(b.ring.visible, false); assert.equal(b.rig.visible, false); };
+  let p = liz(0, 10), b = make(p);
+  b.update(DT, p, true); until(b, p, (_e, bb) => bb.state === 'pounce', 2); check(b);
+  b.emerge(); until(b, p, (_e, bb) => bb.state === 'stalk'); assert.equal(b.update(DT, p, true).windupNow, 'pounce'); // works again after a restart
+  p = liz(0, 30); b = make(p); b.baitWith(tailAt(8, 0)); until(b, p, (_e, bb) => bb.state === 'play', 4); check(b);
+  const t = underTable(); b = make(t.p, t.cols); until(b, t.p, (e) => e.windupNow === 'fish', 20); check(b);
+});

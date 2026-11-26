@@ -48,6 +48,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
   let pounceCD = 0, air = 0, second = false; // air: 0..1 through a leap; second: the sleepy follow-up pounce
   let grace = 0;                             // just got up: her side can't hurt for this long
   const from = new THREE.Vector2(), target = new THREE.Vector2();
+  let bait = null;                           // the dropped tail she is after
   let pose = { roll: 0, sy: 1 };
 
   const sleepy = () => cat.health / cat.maxHealth < C.SLEEPY_BELOW;
@@ -100,7 +101,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     cat.pos.set(sx, terrainHeight(sx, sz), sz);
     cat.yaw = 0; cat.health = cat.maxHealth; cat.state = 'hidden';
     timer = 0; rest = 0; speed = 0; stalkT = 0; pending = null;
-    pounceCD = 0; air = 0; second = false; grace = 0;
+    pounceCD = 0; air = 0; second = false; grace = 0; bait = null;
     pose = { roll: 0, sy: 1 };
     rig.visible = false; ring.visible = false;
   }
@@ -111,6 +112,15 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
   cat.emerge = () => {
     if (cat.state !== 'hidden') return false;
     cat.state = 'emerge'; timer = C.EMERGE; rig.visible = true;
+    return true;
+  };
+
+  // A dropped tail: she can't resist it. Returns false if she is too busy or too far.
+  cat.baitWith = (pos) => {
+    const s = cat.state;
+    if (s !== 'stalk' && s !== 'swipeWind' && s !== 'crouch' && s !== 'yawn' && s !== 'fish') return false;
+    if (Math.hypot(pos.x - cat.pos.x, pos.z - cat.pos.z) > C.TAIL_RANGE) return false;
+    bait = pos.clone(); cat.state = 'trot'; timer = 4; pending = null; ring.visible = false;
     return true;
   };
 
@@ -130,10 +140,17 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
       turnTo(px, pz, dt);
       stalkT += dt;
       if (rest > 0) rest -= dt;
-      else if (d <= C.SWIPE_RANGE && !hid) {
+      else if (hid) {
+        // it is under the furniture: walk over, lie down and fish for it
+        if (d <= C.FISH_DIST + C.BODY_R) { cat.state = 'fish'; timer = C.FISH_TIME; pending = 'fish'; }
+        else step(dx / d, dz / d, C.STALK, dt);
+      } else if (high >= C.REACH_UP) {
+        // out of reach: sit below and wait
+        if (d > C.CIRCLE_R - 1) step(dx / d, dz / d, C.STALK, dt);
+      } else if (d <= C.SWIPE_RANGE) {
         cat.state = 'swipeWind'; timer = C.SWIPE_WINDUP; pending = 'swipe';
         cat.yaw = Math.atan2(dx, dz); // the paw goes where she is looking now
-      } else if (pounceCD <= 0 && d >= C.POUNCE_MIN && d <= C.POUNCE_MAX && !hid && high < 1) {
+      } else if (pounceCD <= 0 && d >= C.POUNCE_MIN && d <= C.POUNCE_MAX && high < 1) {
         second = false;
         if (sleepy()) { cat.state = 'yawn'; timer = C.YAWN; ev.yawnNow = true; } else crouch(px, pz, C.CROUCH);
       } else {
@@ -181,6 +198,21 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     } else if (cat.state === 'recover') {
       timer -= dt;
       if (timer <= 0) getUp(ev, player);
+    } else if (cat.state === 'trot') {
+      const bx = bait.x - cat.pos.x, bz = bait.z - cat.pos.z, bd = Math.hypot(bx, bz) || 1e-6;
+      turnTo(bait.x, bait.z, dt);
+      timer -= dt;
+      if (bd <= C.BODY_R * 0.9 || timer <= 0) { cat.state = 'play'; timer = C.PLAY; } // (or as near as the furniture lets her)
+      else step(bx / bd, bz / bd, C.TROT, dt);
+    } else if (cat.state === 'play') {
+      turnTo(bait.x, bait.z, dt);
+      timer -= dt;
+      if (timer <= 0) { bait = null; getUp(ev, player); }
+    } else if (cat.state === 'fish') {
+      turnTo(px, pz, dt);
+      timer -= dt;
+      if (!hid) stalk(0.5);
+      else if (timer <= 0) { if (canHurt) ev.caught = cat.pos.clone(); stalk(REST); } // batted out from under it
     }
     cat.pos.y = terrainHeight(cat.pos.x, cat.pos.z);
 
@@ -188,7 +220,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     const s = cat.state, up = player.pos.y - cat.pos.y;
     const onFeet = s === 'stalk' || s === 'swipeWind' || s === 'swipe' || s === 'crouch' || s === 'yawn';
     if (d < C.BODY_R && !ev.caught && !ev.bounced) {
-      if (s === 'flop') {
+      if (s === 'flop' || s === 'play') {
         if (player.velY < 0 && up >= 0.4 && up <= C.BACK_FLOP + 1 && !ev.stuckNow) {
           ev.hit = true; cat.health -= 1;
           if (cat.health <= 0) { cat.health = 0; cat.state = 'defeated'; ev.defeated = true; ring.visible = false; }
@@ -208,6 +240,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     const want = now === 'flop' ? { roll: 1.35, sy: 1 }
       : now === 'defeated' ? { roll: 0, sy: 0.55 }
         : now === 'crouch' ? { roll: 0, sy: 0.78 }
+          : now === 'play' || now === 'fish' ? { roll: 0, sy: 0.5 }
           : { roll: 0, sy: 1 };
     const k = Math.min(1, dt * (now === 'defeated' ? 1.2 : 9));
     pose.roll += (want.roll - pose.roll) * k; pose.sy += (want.sy - pose.sy) * k;
