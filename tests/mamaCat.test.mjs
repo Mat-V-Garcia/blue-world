@@ -456,3 +456,14 @@ test('the model is told how fast she is really going and where the lizard is, so
   assert.ok(Math.abs(more.pace - CAT.STALK) < 0.05, `pace ${more.pace}`);
   assert.ok(Math.abs(wrap(Math.atan2(p.pos.x - b.pos.x, p.pos.z - b.pos.z) - b.yaw - more.look)) < 1e-6, 'look is the angle from her nose to the lizard');
 });
+
+test('DOUBLE: at full health a missed pounce is followed by a second before she flops, with no yawn', () => {
+  const p = liz(0, 10), b = make(p, [], { tune: { DOUBLE: true } });
+  until(b, p, (e) => { assert.equal(e.yawnNow, false); return e.windupNow === 'pounce'; }, 5);
+  away(p, 1);
+  const second = until(b, p, (e) => { assert.equal(e.stuckNow, false, 'no flop after the first'); return e.windupNow === 'pounce'; }, 3);
+  assert.equal(second.caught, null);
+  away(p, 2);
+  until(b, p, (e) => { assert.notEqual(e.windupNow, 'pounce', 'two, not three'); return e.stuckNow; }, 3);
+  assert.equal(b.state, 'flop');
+});

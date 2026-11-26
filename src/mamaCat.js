@@ -20,6 +20,7 @@ export const CAT = {
   // measured on the model at scale 6.5: 6.5 long, 2.6 wide, back 3.0 up (1.5 when she lies on her side)
   BODY_R: 2.2, BACK_UP: 3.0, BACK_FLOP: 1.0,
   SLEEPY_BELOW: 0.5, YAWN: 1.0, EMERGE: 1.5,
+  DOUBLE: false,                    // true: every missed pounce is followed by a second, not only when she is sleepy
 };
 const REST = 1.0; // stands still this long after catching the lizard
 
@@ -215,7 +216,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
         dx = px - cat.pos.x; dz = pz - cat.pos.z; d = Math.hypot(dx, dz) || 1e-6;
         if (canHurt && d < C.LAND_R && high < C.BACK_UP - 0.6 && !hid) { ev.caught = cat.pos.clone(); hop = false; stalk(REST); }
         else if (hop) { hop = false; stalk(0.5); } // only getting over the furniture: she lands on her feet
-        else if (sleepy() && !second) { second = true; crouch(px, pz, C.CROUCH * 0.6); } // sleepy and wild: straight into another
+        else if ((C.DOUBLE || sleepy()) && !second) { second = true; crouch(px, pz, C.CROUCH * 0.6); } // sleepy and wild: straight into another
         else { cat.state = 'flop'; timer = C.FLOP; ev.stuckNow = true; }
       }
     } else if (cat.state === 'flop') {

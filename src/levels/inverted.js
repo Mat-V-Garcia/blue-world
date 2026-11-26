@@ -35,8 +35,11 @@ export const FACTORS = {
 // Numbers set outright instead of multiplied.
 // The falcon strikes three times: three rings circle round the lizard while it hovers,
 // stop when it dives, and it hits each in turn. Only after the third is it on the ground.
+// Mama Cat pounces twice from the very start: a missed pounce goes straight into a second
+// one before she flops (the regular Mama Cat only does that once she is half tired out).
 export const SET = {
   falcon: { RINGS: 3 },
+  cat: { DOUBLE: true },
 };
 const BASE = { tarantula: BOSS, falcon: FALCON, cat: CAT };
 const round = (n) => Math.round(n * 100) / 100;

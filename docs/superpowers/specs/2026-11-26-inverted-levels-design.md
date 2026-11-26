@@ -38,6 +38,10 @@ the ground. Standing still is caught; the dodge is to get out of the cluster and
 of the rings it has not hit yet. A dropped tail still gets one dive. (An earlier try the
 same day, aiming ahead of a running lizard, was too tricky and was taken out.)
 
+The inverted Mama Cat pounces twice from the start (`DOUBLE: true`): a missed pounce goes
+straight into a second one before she flops. The regular Mama Cat only does that once she
+is half tired out.
+
 The lizard is unchanged (5 hearts, same speeds). Tarantulas and pigeons are still slower
 than a walking lizard; kittens are still slower than a sprint.
 

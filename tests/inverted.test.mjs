@@ -53,6 +53,8 @@ test('every boss takes two more hits, moves faster and gives a shorter opening',
   assert.deepEqual(c.tune, harderBoss({ kind: 'cat', health: 6 }).tune);
   assert.equal(c.tune.STALK, 3.84);
   assert.equal(c.tune.FLOP, 1.5);
+  assert.equal(c.tune.DOUBLE, true); // she pounces twice from the start
+  assert.equal(CAT.DOUBLE, false);   // the regular one only when she is sleepy
   assert.equal(c.text, CAT_BOSS.text);
 });
 
