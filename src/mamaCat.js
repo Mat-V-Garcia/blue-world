@@ -17,7 +17,8 @@ export const CAT = {
   TROT: 6, PLAY: 3.0, TAIL_RANGE: 20,
   FISH_DIST: 3.5, FISH_TIME: 3.0, LOW_ROOF: 1.5, // LOW_ROOF: furniture this low hides the lizard from her
   REACH_UP: 4,                      // a lizard perched lower than this can still be swiped
-  BODY_R: 2.6, BACK_UP: 3.4, BACK_FLOP: 1.0,
+  // measured on the model at scale 6.5: 6.5 long, 2.6 wide, back 3.0 up (1.5 when she lies on her side)
+  BODY_R: 2.2, BACK_UP: 3.0, BACK_FLOP: 1.0,
   SLEEPY_BELOW: 0.5, YAWN: 1.0, EMERGE: 1.5,
 };
 const REST = 1.0; // stands still this long after catching the lizard
@@ -69,7 +70,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     let nx = cat.pos.x + ux * len, nz = cat.pos.z + uz * len;
     const g = terrainHeight(nx, nz);
     for (const c of colliders) {
-      if (c.top <= g + 0.5) continue;
+      if (c.top <= g + 0.5 || c.bottom >= g + C.BACK_UP + 1.5) continue; // low enough to step over, or a roof above her ears
       const f = footprint(c, nx, nz, g + 0.3);
       if (f.dist < C.BODY_R) {
         nx += f.nx * (C.BODY_R - f.dist) - f.nz * len * 0.6;
@@ -159,7 +160,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
         const inward = Math.max(-1, Math.min(1, d - R)), round = d < C.CIRCLE_R + 2 ? 0.6 : 0;
         const ux = (dx / d) * inward - (dz / d) * round, uz = (dz / d) * inward + (dx / d) * round;
         const n = Math.hypot(ux, uz) || 1;
-        step(ux / n, uz / n, C.STALK, dt);
+        step(ux / n, uz / n, d > C.POUNCE_MAX + 4 ? C.TROT : C.STALK, dt); // she trots to catch up from right across the yard
       }
     } else if (cat.state === 'swipeWind') {
       timer -= dt;
@@ -197,7 +198,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
       if (timer <= 0) getUp(ev, player);
     } else if (cat.state === 'recover') {
       timer -= dt;
-      if (timer <= 0) getUp(ev, player);
+      if (timer <= 0) getUp(ev, player, 0.8); // a breath before she starts again
     } else if (cat.state === 'trot') {
       const bx = bait.x - cat.pos.x, bz = bait.z - cat.pos.z, bd = Math.hypot(bx, bz) || 1e-6;
       turnTo(bait.x, bait.z, dt);
@@ -237,11 +238,8 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
 
     // --- where and how she is drawn ---
     const now = cat.state;
-    const want = now === 'flop' ? { roll: 1.35, sy: 1 }
-      : now === 'defeated' ? { roll: 0, sy: 0.55 }
-        : now === 'crouch' ? { roll: 0, sy: 0.78 }
-          : now === 'play' || now === 'fish' ? { roll: 0, sy: 0.5 }
-          : { roll: 0, sy: 1 };
+    // (lying down to play, fish or sleep is the model's own pose)
+    const want = now === 'flop' ? { roll: 1.35, sy: 1 } : now === 'crouch' ? { roll: 0, sy: 0.78 } : { roll: 0, sy: 1 };
     const k = Math.min(1, dt * (now === 'defeated' ? 1.2 : 9));
     pose.roll += (want.roll - pose.roll) * k; pose.sy += (want.sy - pose.sy) * k;
     rig.position.copy(cat.pos);

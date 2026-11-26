@@ -35,10 +35,17 @@ test('waits hidden, drops in from above, harmless until she lands', () => {
 });
 
 // ---------- stalking ----------
-test('stalks: closes on a far lizard, no faster than CAT.STALK', () => {
-  const p = liz(0, 30), b = make(p);
-  const d0 = dist(b, p), x0 = b.pos.x, z0 = b.pos.z;
+test('a lizard right across the yard is trotted after, faster than a stalk', () => {
+  const p = liz(0, 38), b = make(p);
+  const z0 = b.pos.z;
   run(b, p, 1);
+  const moved = b.pos.z - z0;
+  assert.ok(moved > CAT.STALK + 1 && moved <= CAT.TROT + 0.01, `moved ${moved}`);
+});
+test('stalks: closes on a lizard just out of pouncing range, no faster than CAT.STALK', () => {
+  const p = liz(0, 19), b = make(p);
+  const d0 = dist(b, p), x0 = b.pos.x, z0 = b.pos.z;
+  run(b, p, 0.9);
   assert.equal(b.state, 'stalk');
   assert.ok(dist(b, p) < d0 - 1, 'got closer');
   assert.ok(Math.hypot(b.pos.x - x0, b.pos.z - z0) <= CAT.STALK + 0.01);
@@ -366,4 +373,25 @@ test('reset() during pounce, play and fish: hidden, full health, ring hidden', (
   b.emerge(); until(b, p, (_e, bb) => bb.state === 'stalk'); assert.equal(b.update(DT, p, true).windupNow, 'pounce'); // works again after a restart
   p = liz(0, 30); b = make(p); b.baitWith(tailAt(8, 0)); until(b, p, (_e, bb) => bb.state === 'play', 4); check(b);
   const t = underTable(); b = make(t.p, t.cols); until(b, t.p, (e) => e.windupNow === 'fish', 20); check(b);
+});
+
+// ---------- fairness ----------
+test('after shaking off a hit she waits a moment before her next move, so the lizard can get clear', () => {
+  const p = liz(0, 10), b = make(p);
+  flopHer(b, p);
+  land(b, p);
+  p.pos.set(b.pos.x, 0, b.pos.z + 4); // bounced off, landed right in front of her
+  until(b, p, (_e, bb) => bb.state === 'stalk', 2);
+  const evs = run(b, p, 0.7);
+  assert.ok(evs.every((e) => !e.windupNow && !e.caught), 'no swipe or pounce straight away');
+  until(b, p, (e) => e.windupNow, 1);
+});
+
+// ---------- the real yard ----------
+test('she walks under a high roof (the gazebo) instead of being stopped by it', () => {
+  const roof = { type: 'box', x: 0, z: 14, hx: 6.5, hz: 6.5, angle: 0, bottom: 8.4, top: 8.5 };
+  const p = liz(0, 34), b = make(p, [roof]);
+  run(b, p, 6);
+  assert.ok(b.pos.z > 9, `went under it (z ${b.pos.z.toFixed(1)})`);
+  assert.ok(Math.abs(b.pos.x) < 1, 'in a straight line');
 });
