@@ -17,7 +17,7 @@ test('boulders are low cover, clear of the middle and of the start', () => {
     assert.ok(Math.hypot(b.x, b.z + 32) >= 8);
   }
 });
-test('every level is followed by its boss: tarantula, falcon, big cat', () => {
+test('every level is followed by its boss: tarantula, falcon, mama cat', () => {
   assert.equal(LEVELS.length, 6);
   assert.deepEqual(LEVELS.map((l) => !!l.boss), [false, true, false, true, false, true]);
   for (const l of LEVELS.filter((x) => x.boss)) assert.ok(l.icon);
@@ -45,7 +45,21 @@ test('falcon level: ten pebbles spread round the shops, low enough to reach from
   assert.ok(PERCH.y > 25);
 });
 
-import { PEBBLES as CAT_PEBBLES, CAT_START } from '../src/levels/cat.js';
+import { PEBBLES as CAT_PEBBLES, CAT_START, BOSS as CAT_BOSS } from '../src/levels/cat.js';
+test('cat level: the boss is Mama Cat, six hits, with nothing to shoot', () => {
+  assert.equal(CAT_BOSS.kind, 'cat');
+  assert.equal(CAT_BOSS.health, 6);
+  assert.equal(CAT_BOSS.text.name, 'Mama Cat');
+  assert.equal('shotColor' in CAT_BOSS, false);
+  assert.equal(CAT_BOSS.tune?.WEB_TIME, undefined);
+  assert.equal('webbed' in CAT_BOSS.text, false);
+  assert.ok(!JSON.stringify(CAT_BOSS.text).match(/hairball|big cat/i));
+});
+test('cat level: the menu calls her Mama Cat and never mentions hairballs', () => {
+  const l = LEVELS[5];
+  assert.equal(l.name, 'Mama Cat');
+  for (const k of ['intro', 'hint', 'help', 'helpTouch']) { assert.match(l[k], /mama/i, k); assert.doesNotMatch(l[k], /hairball|big cat/i, k); }
+});
 test('cat level: ten pebbles on the ground, spread out, none where the cat lands', () => {
   assert.equal(CAT_PEBBLES.length, 10);
   for (const [i, p] of CAT_PEBBLES.entries()) {

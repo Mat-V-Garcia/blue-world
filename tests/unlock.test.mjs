@@ -59,7 +59,7 @@ test('asking for the boss by address falls back to Level 3 until it is unlocked'
 import { LEVELS, levelLabel } from '../src/levels/index.js';
 
 test('level order: the boss comes straight after the desert', () => {
-  assert.deepEqual(LEVELS.map((l) => l.name), ['The Desert', 'The Giant Tarantula', 'Fullerton Shops', 'The Peregrine Falcon', 'The Back Yard', 'The Big Cat']);
+  assert.deepEqual(LEVELS.map((l) => l.name), ['The Desert', 'The Giant Tarantula', 'Fullerton Shops', 'The Peregrine Falcon', 'The Back Yard', 'Mama Cat']);
   assert.deepEqual(LEVELS.map((l) => l.id), [1, 2, 3, 4, 5, 6]);
   assert.deepEqual(LEVELS.map(levelLabel), ['Level 1', 'Boss', 'Level 2', 'Boss', 'Level 3', 'Boss']);
 });

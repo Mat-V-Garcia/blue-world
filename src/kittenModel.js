@@ -141,7 +141,7 @@ export async function loadKittenModel(url = '/assets/kitten.glb') {
     }
   });
 
-  return function makeKitten(coat) { // coat (optional): a fur tint, for the big cat boss
+  return function makeKitten(coat) { // coat (optional): a fur tint, for Mama Cat's stand-in
     const model = cloneSkinned(source);
     const tint = new THREE.Color(coat ?? TINTS[nextTint++ % TINTS.length]);
     model.traverse((o) => {

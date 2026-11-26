@@ -14,6 +14,8 @@ import { createPebbles, createDust } from './pebbles.js';
 import { sfx } from './audio.js';
 import { createTailDrop } from './tail.js';
 import { createBoss, BOSS } from './boss.js';
+import { createMamaCat } from './mamaCat.js';
+import { loadMamaCatModel } from './mamaCatModel.js';
 import { createFalcon } from './falcon.js';
 import { createStorm, stormLevel } from './storm.js';
 import { createPortal, createFlip, createRedSkin } from './portal.js';
@@ -188,7 +190,18 @@ async function init() {
     return g;
   });
   if (world.boss) {
-    boss = (world.boss.kind === 'falcon' ? createFalcon : createBoss)(scene, world.colliders, () => makeEnemy(world.boss.coat), world.boss);
+    let makeBoss = () => makeEnemy(world.boss.coat), bossCfg = world.boss;
+    if (world.boss.kind === 'cat') {
+      try {
+        makeBoss = await loadMamaCatModel();
+      } catch (err) {
+        // stand-in: the kitten model, orange and scaled up to her length (it is 2 units long)
+        console.warn('Mama Cat model failed to load, using a big kitten', err);
+        makeBoss = () => makeEnemy(0xf2a25a); bossCfg = { ...world.boss, scale: world.boss.scale / 2 };
+      }
+    }
+    const createFoe = { falcon: createFalcon, cat: createMamaCat }[world.boss.kind] ?? createBoss;
+    boss = createFoe(scene, world.colliders, makeBoss, bossCfg);
     document.querySelector('#bossbar span').textContent = world.boss.text.name;
     storm = createStorm(scene, { sky: world.sky, fog: scene.fog, hemi, sun, lightning: world.boss.lightning });
     document.body.classList.add('boss');
@@ -356,7 +369,8 @@ function bossFrame(dt, playing) {
     if (ev.bonked) { toast('Bonk!'); dust.puff(boss.pos, 8, 1.5); }
     else if (!stuckTold) { stuckTold = true; toast(world.boss.text.stuck); }
   }
-  if (ev.windupNow === 'lunge') (world.boss.kind === 'cat' ? sfx.meow : sfx.hiss)();
+  if (ev.windupNow === 'lunge') sfx.hiss();
+  if (ev.windupNow && world.boss.kind === 'cat') sfx.meow(); // paw up, crouching to pounce, or reaching under the table
   if (ev.windupNow === 'dive') sfx.screech();
   if (ev.shotNow) sfx.web();
   if (ev.splat) {
