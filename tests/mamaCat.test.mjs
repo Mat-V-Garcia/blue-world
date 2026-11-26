@@ -421,3 +421,38 @@ test('tail: one dropped on a perch out of her reach is ignored', () => {
   assert.equal(b.state, 'stalk');
   assert.equal(b.baitWith(new THREE.Vector3(8, CAT.REACH_UP - 1, 0)), true);
 });
+
+// ---------- how she moves ----------
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+test('circling the lizard she points the way she is walking, not sideways at it', () => {
+  const p = liz(0, 8), b = make(p, [], { tune: { POUNCE_MIN: 99 } }); // no pounces: just the circle
+  run(b, p, 1);
+  let checked = 0;
+  for (let i = 0; i < 60; i++) {
+    const x = b.pos.x, z = b.pos.z;
+    b.update(DT, p, true);
+    const mx = b.pos.x - x, mz = b.pos.z - z;
+    if (b.state !== 'stalk' || Math.hypot(mx, mz) < 1e-4) continue;
+    checked++;
+    assert.ok(Math.abs(wrap(Math.atan2(mx, mz) - b.yaw)) < 0.5, `walking ${Math.atan2(mx, mz).toFixed(2)} but facing ${b.yaw.toFixed(2)}`);
+  }
+  assert.ok(checked > 20, 'she was walking');
+});
+test('she turns to face the lizard while she lifts her paw', () => {
+  const p = liz(0, 8), b = make(p, [], { tune: { POUNCE_MIN: 99 } });
+  until(b, p, (e) => e.windupNow === 'swipe', 10);
+  run(b, p, CAT.SWIPE_WINDUP - 0.05);
+  assert.ok(Math.abs(wrap(Math.atan2(p.pos.x - b.pos.x, p.pos.z - b.pos.z) - b.yaw)) < 0.15);
+  until(b, p, (e) => e.caught, 0.5);
+});
+test('the model is told how fast she is really going and where the lizard is, so it can pace her steps and turn her head', () => {
+  const calls = [];
+  setGround({ height: () => 0, radius: 40 });
+  const b = createMamaCat(scene, [], () => ({ root: new THREE.Object3D(), update: (...a) => calls.push(a) }), { x: 0, z: 0, emergeFrom: 9 });
+  const p = liz(12, 19);
+  b.emerge(); until(b, p, (_e, bb) => bb.state === 'stalk'); run(b, p, 0.5);
+  const [, , state, more] = calls.at(-1);
+  assert.equal(state, 'stalk');
+  assert.ok(Math.abs(more.pace - CAT.STALK) < 0.05, `pace ${more.pace}`);
+  assert.ok(Math.abs(wrap(Math.atan2(p.pos.x - b.pos.x, p.pos.z - b.pos.z) - b.yaw - more.look)) < 1e-6, 'look is the angle from her nose to the lizard');
+});
