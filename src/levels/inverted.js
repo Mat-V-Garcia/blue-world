@@ -53,10 +53,12 @@ export function harderEnemies(e = { kind: 'tarantula' }) {
 }
 
 // A level's `boss` config, made harder: more health, and `tune` overrides for its numbers.
+// The factors apply to the boss's standard numbers, not to the regular level's own `tune`:
+// easing a regular boss does not ease its inverted twin.
 export function harderBoss(boss) {
   const kind = boss.kind ?? 'tarantula', base = BASE[kind];
-  const tune = { ...boss.tune };
-  for (const [k, f] of Object.entries(FACTORS[kind])) tune[k] = round((tune[k] ?? base[k]) * f);
+  const tune = {};
+  for (const [k, f] of Object.entries(FACTORS[kind])) tune[k] = round(base[k] * f);
   Object.assign(tune, SET[kind]);
   return { ...boss, health: (boss.health ?? base.HEALTH) + EXTRA_HEALTH, tune };
 }

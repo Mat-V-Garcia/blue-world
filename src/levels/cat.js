@@ -29,6 +29,14 @@ export const BOSS = {
   emergeFrom: 9,         // she drops in over the fence
   sleeps: true,          // beaten = fast asleep, still there
   lightning: false,      // the sky only turns to sunset as she gets sleepy
+  // A little gentler than her standard numbers (CAT in ../mamaCat.js): about 10% slower,
+  // a longer warning before each attack and a longer flop. The inverted Mama Cat does not
+  // get these: she is built from the standard numbers (see ./inverted.js).
+  tune: {
+    STALK: 2.9, TROT: 5.4,                         // standard 3.2, 6
+    SWIPE_WINDUP: 0.7, CROUCH: 1.0, POUNCE_CD: 2.8, // standard 0.6, 0.9, 2.5
+    FLOP: 2.3, PLAY: 3.3,                          // standard 2.0, 3.0
+  },
   text: {
     name: 'Mama Cat',
     wake: "The kittens' mama is climbing the fence…",

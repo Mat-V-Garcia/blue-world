@@ -46,7 +46,13 @@ test('every boss takes two more hits, moves faster and gives a shorter opening',
   const c = harderBoss(CAT_BOSS);
   assert.equal(c.health, 8);
   assert.ok(c.tune.STALK > CAT.STALK && c.tune.FLOP < CAT.FLOP && c.tune.PLAY < CAT.PLAY && c.tune.CROUCH < CAT.CROUCH);
-  assert.equal(CAT_BOSS.tune, undefined);      // the regular Mama Cat is not changed
+  // the regular Mama Cat is a little gentler than standard, and that easing does not
+  // carry over: the inverted one is built from her standard numbers
+  assert.ok(CAT_BOSS.tune.STALK < CAT.STALK && CAT_BOSS.tune.FLOP > CAT.FLOP && CAT_BOSS.tune.CROUCH > CAT.CROUCH);
+  assert.equal(CAT_BOSS.health, 6);
+  assert.deepEqual(c.tune, harderBoss({ kind: 'cat', health: 6 }).tune);
+  assert.equal(c.tune.STALK, 3.84);
+  assert.equal(c.tune.FLOP, 1.5);
   assert.equal(c.text, CAT_BOSS.text);
 });
 
