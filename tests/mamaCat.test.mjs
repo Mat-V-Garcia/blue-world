@@ -102,3 +102,152 @@ test('reset(): hidden again at full health where she started', () => {
   assert.equal(b.pos.x, 0); assert.equal(b.pos.z, 0);
   assert.equal(b.rig.visible, false);
 });
+
+// ---------- pounce, flop, hits ----------
+const away = (p, n = 1) => { p.pos.set(n % 2 ? 20 : -20, 0, n % 2 ? -20 : 20); p.velY = 0; p.onGround = true; };
+// dodge every pounce until she flops; returns the frame she flopped in
+const flopHer = (b, p) => { let n = 0; return until(b, p, (e) => { if (e.windupNow === 'pounce') away(p, ++n); return e.stuckNow; }, 30); };
+// drop onto her back for one frame, then step well clear
+const land = (b, p) => {
+  p.pos.set(b.pos.x, 0.9, b.pos.z); p.velY = -3; p.onGround = false;
+  const e = b.update(DT, p, true);
+  p.pos.set(b.pos.x, 0, b.pos.z + 10); p.velY = 0; p.onGround = true;
+  return e;
+};
+
+test('pounce: crouches 0.9 s at mid range with a ring on the landing spot, then leaps there in a high arc', () => {
+  const p = liz(0, 10), b = make(p);
+  assert.equal(b.ring.visible, false);
+  assert.equal(b.update(DT, p, true).windupNow, 'pounce');
+  assert.equal(b.state, 'crouch');
+  assert.ok(b.ring.visible && Math.abs(b.ring.position.x) < 0.01 && Math.abs(b.ring.position.z - 10) < 0.01);
+  run(b, p, CAT.CROUCH - 2 * DT);
+  assert.equal(b.state, 'crouch');
+  until(b, p, (_e, bb) => bb.state === 'pounce', 0.1);
+  away(p);
+  let peak = 0;
+  until(b, p, (e, bb) => { peak = Math.max(peak, bb.rig.position.y); return e.stuckNow; }, 2);
+  assert.ok(Math.abs(peak - CAT.ARC) < 0.2, `peak ${peak}`);
+  assert.ok(Math.hypot(b.pos.x, b.pos.z - 10) < 0.01, 'landed where the lizard was');
+  assert.equal(b.ring.visible, false);
+});
+test('pounce: landing on the lizard costs a heart and she does not flop', () => {
+  const p = liz(0, 10), b = make(p);
+  let flopped = false;
+  const e = until(b, p, (ev) => { flopped ||= ev.stuckNow; return ev.caught; }, 3);
+  assert.ok(e.caught.isVector3);
+  assert.equal(flopped, false);
+  assert.notEqual(b.state, 'flop');
+});
+test('pounce: a dodged pounce flops her for 2.0 s, then she gets up', () => {
+  const p = liz(0, 10), b = make(p);
+  flopHer(b, p);
+  assert.equal(b.state, 'flop');
+  assert.ok(run(b, p, CAT.FLOP - 0.1).every((e) => !e.stuckNow), 'flops once');
+  assert.equal(b.state, 'flop');
+  run(b, p, 0.2);
+  assert.notEqual(b.state, 'flop');
+});
+test('landing on her flopped back is a hit; she shakes it off for 1.5 s and cannot be hit or hurt meanwhile', () => {
+  const p = liz(0, 10), b = make(p);
+  flopHer(b, p);
+  const e = land(b, p);
+  assert.equal(e.hit, true);
+  assert.equal(b.health, CAT.HEALTH - 1);
+  assert.equal(b.state, 'recover');
+  const again = land(b, p);
+  assert.equal(again.hit, false); assert.equal(again.caught, null);
+  assert.equal(b.health, CAT.HEALTH - 1);
+  p.pos.set(b.pos.x + 1, 0, b.pos.z);
+  assert.equal(b.update(DT, p, true).caught, null, 'her side is harmless while she shakes it off');
+  away(p);
+  run(b, p, CAT.RECOVER - 0.2);
+  assert.equal(b.state, 'recover');
+  run(b, p, 0.3);
+  assert.notEqual(b.state, 'recover');
+});
+test('standing beside her while she is flopped does not hurt', () => {
+  const p = liz(0, 10), b = make(p);
+  flopHer(b, p);
+  p.pos.set(b.pos.x + 1, 0, b.pos.z);
+  assert.ok(run(b, p, 1).every((e) => !e.caught && !e.hit));
+});
+test('lizard still on her back when the flop ends is bounced off, not hurt', () => {
+  const p = liz(0, 10), b = make(p);
+  flopHer(b, p);
+  p.pos.set(b.pos.x, CAT.BACK_FLOP, b.pos.z); p.velY = 0; p.onGround = true;
+  const evs = run(b, p, CAT.FLOP + 0.6);
+  assert.ok(evs.some((e) => e.bounced), 'bounced');
+  assert.ok(evs.every((e) => !e.caught && !e.hit));
+});
+test('pounce aimed outside the yard lands inside it', () => {
+  const R = 20, p = liz(0, 19.5), b = make(p, [], {}, R);
+  until(b, p, (e) => e.windupNow === 'pounce', 20);
+  assert.ok(Math.hypot(b.ring.position.x, b.ring.position.z) <= R - CAT.BODY_R + 0.01);
+  p.pos.set(0, 0, -15);
+  until(b, p, (e) => e.stuckNow, 3);
+  assert.ok(Math.hypot(b.pos.x, b.pos.z) <= R - CAT.BODY_R + 0.01);
+});
+const table = (x, z) => ({ type: 'box', x, z, hx: 1.6, hz: 1.1, angle: 0, bottom: 1.0, top: 1.25 });
+test('lizard hides during the crouch: the pounce is called off', () => {
+  const cols = [], p = liz(0, 10), b = make(p, cols);
+  b.update(DT, p, true);
+  assert.equal(b.state, 'crouch');
+  cols.push(table(0, 10));
+  b.update(DT, p, true);
+  assert.notEqual(b.state, 'crouch');
+  assert.equal(b.ring.visible, false);
+  for (let i = 0; i < 120; i++) { b.update(DT, p, true); assert.notEqual(b.state, 'pounce'); assert.notEqual(b.state, 'crouch'); }
+});
+test('sleepy: below half health she yawns, and a missed pounce is followed by a second before she flops', () => {
+  const p = liz(0, 10), b = make(p);
+  b.health = 2;
+  assert.equal(b.update(DT, p, true).yawnNow, true);
+  assert.equal(b.state, 'yawn');
+  run(b, p, CAT.YAWN - 0.1);
+  assert.equal(b.state, 'yawn');
+  until(b, p, (e) => e.windupNow === 'pounce', 0.3);
+  away(p, 1);
+  const second = until(b, p, (e) => { assert.equal(e.stuckNow, false, 'no flop after the first'); return e.windupNow === 'pounce'; }, 3);
+  assert.equal(second.caught, null);
+  away(p, 2);
+  until(b, p, (e) => e.stuckNow, 3);
+});
+test('not sleepy at exactly half health: no yawn, one pounce', () => {
+  const p = liz(0, 10), b = make(p);
+  b.health = 3;
+  assert.equal(b.update(DT, p, true).windupNow, 'pounce');
+  away(p);
+  until(b, p, (e) => { assert.equal(e.yawnNow, false); return e.stuckNow; }, 3);
+});
+test('flop lasts 2.0 s at every health', () => {
+  for (const h of [6, 1]) {
+    const p = liz(0, 10), b = make(p);
+    b.health = h;
+    flopHer(b, p);
+    run(b, p, CAT.FLOP - 0.1);
+    assert.equal(b.state, 'flop', `health ${h}`);
+    run(b, p, 0.2);
+    assert.notEqual(b.state, 'flop', `health ${h}`);
+  }
+});
+test('sixth hit: asleep where she is, still in view, ring hidden', () => {
+  const p = liz(0, 10), b = make(p);
+  let last;
+  for (let n = 0; n < 6; n++) {
+    flopHer(b, p);
+    last = land(b, p);
+    assert.equal(last.hit, true, `hit ${n + 1}`);
+    assert.equal(last.defeated, n === 5);
+  }
+  assert.equal(b.health, 0);
+  assert.equal(b.state, 'defeated');
+  const evs = run(b, p, 5);
+  assert.equal(b.state, 'defeated');
+  assert.ok(evs.every((e) => !e.caught && !e.hit && !e.windupNow));
+  assert.equal(b.rig.visible, true);
+  assert.ok(Math.abs(b.rig.position.y) < 0.2);
+  assert.equal(b.ring.visible, false);
+  p.pos.set(b.pos.x + 1, 0, b.pos.z);
+  assert.equal(b.update(DT, p, true).caught, null, 'a sleeping cat is harmless');
+});

@@ -36,9 +36,27 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     pos: new THREE.Vector3(), yaw: 0, health: 0, maxHealth: cfg.health ?? C.HEALTH,
     state: 'hidden', bodyR: C.BODY_R, rig,
   };
-  let timer = 0, rest = 0, speed = 0, stalkT = 0, pending = null;
+  // the ring that marks where a pounce will land
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(C.LAND_R * 0.82, C.LAND_R, 28).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: 0x2a2030, transparent: true, opacity: 0.45, depthWrite: false }),
+  );
+  ring.visible = false; scene.add(ring);
+  cat.ring = ring;
 
-  const groundUnder = (p) => p.pos.y - terrainHeight(p.pos.x, p.pos.z);
+  let timer = 0, rest = 0, speed = 0, stalkT = 0, pending = null;
+  let pounceCD = 0, air = 0, second = false; // air: 0..1 through a leap; second: the sleepy follow-up pounce
+  let grace = 0;                             // just got up: her side can't hurt for this long
+  const from = new THREE.Vector2(), target = new THREE.Vector2();
+  let pose = { roll: 0, sy: 1 };
+
+  const sleepy = () => cat.health / cat.maxHealth < C.SLEEPY_BELOW;
+  const heightOver = (p) => p.pos.y - terrainHeight(p.pos.x, p.pos.z);
+  // tucked under furniture too low for her to follow
+  const hiding = (p) => {
+    const g = terrainHeight(p.pos.x, p.pos.z);
+    return colliders.some((c) => c.bottom >= p.pos.y + 0.3 && c.bottom - g <= C.LOW_ROOF && footprint(c, p.pos.x, p.pos.z).dist <= 0);
+  };
   const turnTo = (x, z, dt) => {
     let d = Math.atan2(x - cat.pos.x, z - cat.pos.z) - cat.yaw;
     d = Math.atan2(Math.sin(d), Math.cos(d));
@@ -61,13 +79,30 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     speed = Math.hypot(nx - cat.pos.x, nz - cat.pos.z) / Math.max(dt, 1e-4);
     cat.pos.x = nx; cat.pos.z = nz;
   }
-  const stalk = (pause = 0) => { cat.state = 'stalk'; rest = pause; stalkT = 0; };
+  const stalk = (pause = 0) => { cat.state = 'stalk'; rest = pause; stalkT = 0; ring.visible = false; };
+  // getting up with the lizard still on or under her: it is tipped off, not hurt
+  const getUp = (ev, player, pause = 0) => {
+    if (Math.hypot(player.pos.x - cat.pos.x, player.pos.z - cat.pos.z) < C.BODY_R) ev.bounced = true;
+    grace = 1; stalk(pause);
+  };
+  // crouch facing the lizard; the leap goes to where it is now (never further than she can jump, never out of the yard)
+  function crouch(px, pz, secs) {
+    let dx = px - cat.pos.x, dz = pz - cat.pos.z;
+    const d = Math.hypot(dx, dz) || 1e-6, k = Math.min(1, C.POUNCE_MAX / d);
+    const [tx, tz] = clampToWorld(cat.pos.x + dx * k, cat.pos.z + dz * k, C.BODY_R);
+    target.set(tx, tz);
+    cat.yaw = Math.atan2(dx, dz);
+    cat.state = 'crouch'; timer = secs; pending = 'pounce';
+    ring.position.set(tx, terrainHeight(tx, tz) + 0.06, tz); ring.visible = true;
+  }
 
   function reset() {
     cat.pos.set(sx, terrainHeight(sx, sz), sz);
     cat.yaw = 0; cat.health = cat.maxHealth; cat.state = 'hidden';
     timer = 0; rest = 0; speed = 0; stalkT = 0; pending = null;
-    rig.visible = false;
+    pounceCD = 0; air = 0; second = false; grace = 0;
+    pose = { roll: 0, sy: 1 };
+    rig.visible = false; ring.visible = false;
   }
   reset();
   cat.reset = reset;
@@ -83,9 +118,9 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     const ev = { caught: null, hit: false, bounced: false, defeated: false, stuckNow: false, windupNow: null, yawnNow: false };
     if (cat.state === 'hidden') return ev;
     const px = player.pos.x, pz = player.pos.z;
-    const dx = px - cat.pos.x, dz = pz - cat.pos.z, d = Math.hypot(dx, dz) || 1e-6;
-    const high = groundUnder(player);
-    speed = 0;
+    let dx = px - cat.pos.x, dz = pz - cat.pos.z, d = Math.hypot(dx, dz) || 1e-6;
+    const high = heightOver(player), hid = hiding(player);
+    speed = 0; pounceCD -= dt; grace -= dt;
 
     if (cat.state === 'emerge') {
       turnTo(px, pz, dt);
@@ -95,9 +130,12 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
       turnTo(px, pz, dt);
       stalkT += dt;
       if (rest > 0) rest -= dt;
-      else if (d <= C.SWIPE_RANGE) {
+      else if (d <= C.SWIPE_RANGE && !hid) {
         cat.state = 'swipeWind'; timer = C.SWIPE_WINDUP; pending = 'swipe';
         cat.yaw = Math.atan2(dx, dz); // the paw goes where she is looking now
+      } else if (pounceCD <= 0 && d >= C.POUNCE_MIN && d <= C.POUNCE_MAX && !hid && high < 1) {
+        second = false;
+        if (sleepy()) { cat.state = 'yawn'; timer = C.YAWN; ev.yawnNow = true; } else crouch(px, pz, C.CROUCH);
       } else {
         // a circle round the lizard that tightens until she is close enough to swipe
         const R = Math.max(C.SWIPE_RANGE - 0.5, C.CIRCLE_R - stalkT * 1.2);
@@ -119,24 +157,66 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
         timer -= dt;
         if (timer <= 0) stalk(C.SWIPE_REST);
       }
+    } else if (cat.state === 'yawn') {
+      timer -= dt;
+      if (timer <= 0) crouch(px, pz, C.CROUCH);
+    } else if (cat.state === 'crouch') {
+      timer -= dt;
+      if (hid) stalk();
+      else if (timer <= 0) { cat.state = 'pounce'; air = 0; from.set(cat.pos.x, cat.pos.z); }
+    } else if (cat.state === 'pounce') {
+      air = Math.min(1, air + dt / C.AIR);
+      cat.pos.x = from.x + (target.x - from.x) * air; cat.pos.z = from.y + (target.y - from.y) * air;
+      speed = C.TROT;
+      if (air >= 1) {
+        air = 0; ring.visible = false; pounceCD = C.POUNCE_CD;
+        dx = px - cat.pos.x; dz = pz - cat.pos.z; d = Math.hypot(dx, dz) || 1e-6;
+        if (canHurt && d < C.LAND_R && high < C.BACK_UP - 0.6) { ev.caught = cat.pos.clone(); stalk(REST); }
+        else if (sleepy() && !second) { second = true; crouch(px, pz, C.CROUCH * 0.6); } // sleepy and wild: straight into another
+        else { cat.state = 'flop'; timer = C.FLOP; ev.stuckNow = true; }
+      }
+    } else if (cat.state === 'flop') {
+      timer -= dt;
+      if (timer <= 0) getUp(ev, player);
+    } else if (cat.state === 'recover') {
+      timer -= dt;
+      if (timer <= 0) getUp(ev, player);
     }
     cat.pos.y = terrainHeight(cat.pos.x, cat.pos.z);
 
     // --- the lizard touching her or landing on her ---
-    const up = player.pos.y - cat.pos.y;
-    if (d < C.BODY_R && cat.state !== 'emerge' && !ev.caught) {
-      if (player.velY < 0 && Math.abs(up - C.BACK_UP) <= 0.6) ev.bounced = true;
-      else if (up < C.BACK_UP - 0.6 && canHurt) { ev.caught = cat.pos.clone(); stalk(REST); }
+    const s = cat.state, up = player.pos.y - cat.pos.y;
+    const onFeet = s === 'stalk' || s === 'swipeWind' || s === 'swipe' || s === 'crouch' || s === 'yawn';
+    if (d < C.BODY_R && !ev.caught && !ev.bounced) {
+      if (s === 'flop') {
+        if (player.velY < 0 && up >= 0.4 && up <= C.BACK_FLOP + 1 && !ev.stuckNow) {
+          ev.hit = true; cat.health -= 1;
+          if (cat.health <= 0) { cat.health = 0; cat.state = 'defeated'; ev.defeated = true; ring.visible = false; }
+          else { cat.state = 'recover'; timer = C.RECOVER; }
+        }
+      } else if (onFeet) {
+        if (player.velY < 0 && Math.abs(up - C.BACK_UP) <= 0.6) ev.bounced = true;
+        else if (up < C.BACK_UP - 0.6 && canHurt && grace <= 0) { ev.caught = cat.pos.clone(); stalk(REST); }
+      }
     }
 
     if (pending && cat.state !== 'stalk') ev.windupNow = pending;
     pending = null;
 
-    // --- where she is drawn ---
+    // --- where and how she is drawn ---
+    const now = cat.state;
+    const want = now === 'flop' ? { roll: 1.35, sy: 1 }
+      : now === 'defeated' ? { roll: 0, sy: 0.55 }
+        : now === 'crouch' ? { roll: 0, sy: 0.78 }
+          : { roll: 0, sy: 1 };
+    const k = Math.min(1, dt * (now === 'defeated' ? 1.2 : 9));
+    pose.roll += (want.roll - pose.roll) * k; pose.sy += (want.sy - pose.sy) * k;
     rig.position.copy(cat.pos);
-    if (cat.state === 'emerge') rig.position.y += FROM * (timer / C.EMERGE) ** 2;
+    if (now === 'emerge') rig.position.y += FROM * (timer / C.EMERGE) ** 2;
+    if (now === 'pounce') rig.position.y += C.ARC * Math.sin(Math.PI * air);
     rig.rotation.y = cat.yaw;
-    v.update(dt, speed / C.STALK, cat.state);
+    tilt.rotation.z = pose.roll; tilt.scale.y = pose.sy;
+    v.update(dt, speed / C.STALK, now);
     return ev;
   };
   return cat;
