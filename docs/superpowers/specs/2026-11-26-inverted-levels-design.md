@@ -31,11 +31,12 @@ All of it is in `src/levels/inverted.js`, as multipliers on the regular numbers.
 | Boss: time you can jump on its back (stuck, down, flopped, playing with the tail) | | 25% shorter |
 | Boss: pauses between attacks (web cooldown, circling, pounce cooldown) | | 20% shorter |
 
-The inverted falcon got a second pass the same day (Mathew: still too easy). Running in a
-straight line used to dodge every dive, because it dived at where the lizard was. Now it
-aims ahead of a running lizard (`LEAD` 0.9 in `src/falcon.js`, 0 for the regular falcon),
-so you have to swerve or stop when it dives; the ring shows the spot. Its ring is wider
-(2.1 instead of 1.7) and it stays down 35% less long instead of 25%.
+The inverted falcon strikes three times (`RINGS: 3`, set in `src/levels/inverted.js`).
+While it hovers, three red rings circle close round the lizard. When it dives they stop,
+and it hits each ring in turn, hopping up between them. Only after the third is it down on
+the ground. Standing still is caught; the dodge is to get out of the cluster and stay out
+of the rings it has not hit yet. A dropped tail still gets one dive. (An earlier try the
+same day, aiming ahead of a running lizard, was too tricky and was taken out.)
 
 The lizard is unchanged (5 hearts, same speeds). Tarantulas and pigeons are still slower
 than a walking lizard; kittens are still slower than a sprint.

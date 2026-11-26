@@ -172,42 +172,89 @@ test('tune overrides the falcon\'s numbers (the inverted level uses this)', asyn
   assert.equal(createFalcon(new THREE.Scene(), [], model, {}).bodyR, FALCON.BODY_R);
 });
 
-// ---- aiming ahead (the inverted falcon) ----
-const leading = () => {
+// ---- three strikes (the inverted falcon) ----
+const triple = () => {
   setGround({ height: () => 0, radius: 66 });
-  return createFalcon(scene, [], model, { perch: { x: -20, y: 30, z: 20 }, tune: { LEAD: 0.9 } });
+  return createFalcon(scene, [], model, { perch: { x: -20, y: 30, z: 20 }, tune: { RINGS: 3 } });
 };
-// the lizard runs along +x at `v` until the dive starts, then does `after(p)` each step
-const runThen = (b, p, v, after) => {
-  for (let i = 0; i < 20 * 60; i++) {
-    if (b.state === 'dive') after(p); else p.pos.x += v / 60;
-    if (p.pos.x > 40) p.pos.x -= 80; // stay inside the level (a jump in position, ignored by its aim)
-    const e = b.update(1 / 60, p, true);
-    if (e.caught || e.stuckNow) return e;
-  }
-  assert.fail('never dived');
-};
-test('without LEAD, a lizard that just keeps walking is missed', () => {
-  const b = make(), p = liz(0, 0);
+const shown = (b) => b.rings.filter((r) => r.visible);
+test('the regular falcon has one ring, on the lizard', () => {
+  const b = make(), p = liz(3, 4);
   b.emerge();
-  assert.ok(runThen(b, p, 5.5, (q) => { q.pos.x += 5.5 / 60; }).stuckNow);
+  until(b, p, (_e, bb) => bb.state === 'windup');
+  assert.equal(b.rings.length, 1);
+  assert.equal(shown(b).length, 1);
+  assert.ok(Math.hypot(b.rings[0].position.x - 3, b.rings[0].position.z - 4) < 0.01);
 });
-test('with LEAD, a lizard that keeps going in a straight line is caught, walking or sprinting', () => {
-  for (const v of [5.5, 10]) {
-    const b = leading(), p = liz(0, 0);
-    b.emerge();
-    assert.ok(runThen(b, p, v, (q) => { q.pos.x += v / 60; }).caught, `at speed ${v}`);
+test('with three rings, they circle close round the lizard while it hovers, and stop when it dives', () => {
+  const b = triple(), p = liz(0, 0);
+  b.emerge();
+  until(b, p, (_e, bb) => bb.state === 'windup');
+  b.update(1 / 60, p, true);
+  assert.equal(shown(b).length, 3);
+  const at = () => b.rings.map((r) => [r.position.x, r.position.z]);
+  const a = at();
+  for (const [x, z] of a) assert.ok(Math.abs(Math.hypot(x, z) - FALCON.RING_R) < 0.01);
+  b.update(1 / 60, p, true);
+  assert.notDeepEqual(at(), a, 'turning');
+  p.pos.x = 5; b.update(1 / 60, p, true);
+  for (const [x, z] of at()) assert.ok(Math.abs(Math.hypot(x - 5, z) - FALCON.RING_R) < 0.01, 'following the lizard');
+  until(b, p, (_e, bb) => bb.state === 'dive');
+  const fixed = at();
+  p.pos.x = 30; b.update(1 / 60, p, true); b.update(1 / 60, p, true);
+  assert.deepEqual(at(), fixed);
+});
+test('with three rings, it strikes all three before it is down, and a ring goes out as it is struck', () => {
+  const b = triple(), p = liz(0, 0);
+  b.emerge();
+  until(b, p, (_e, bb) => bb.state === 'dive');
+  p.pos.x = 30; // well clear of all three
+  const spots = b.rings.map((r) => r.position.clone());
+  let strikes = 0, e;
+  for (let i = 0; i < 10 * 60; i++) {
+    e = b.update(1 / 60, p, true);
+    if (e.struck) { strikes++; assert.equal(shown(b).length, 3 - strikes); assert.equal(b.state, 'hop'); }
+    if (e.stuckNow) break;
   }
+  assert.equal(strikes, 2);
+  assert.ok(e.stuckNow);
+  assert.equal(b.state, 'stuck');
+  assert.ok(Math.hypot(b.pos.x - spots[2].x, b.pos.z - spots[2].z) < 0.5, 'down at the last ring');
+  assert.equal(shown(b).length, 0);
+  assert.equal(land(b, p).hit, true); // and it can be landed on there
 });
-test('with LEAD, a sprinting lizard that stops or turns back when it dives is missed', () => {
-  for (const turn of [0, -10]) {
-    const b = leading(), p = liz(0, 0);
-    b.emerge();
-    assert.ok(runThen(b, p, 10, (q) => { q.pos.x += turn / 60; }).stuckNow, `then ${turn}`);
-  }
-});
-test('with LEAD, a lizard that stands still is still caught where it stands', () => {
-  const b = leading(), p = liz(0, 0);
+test('with three rings, a lizard that stands still is caught', () => {
+  const b = triple(), p = liz(0, 0);
   b.emerge();
   assert.ok(until(b, p, (ev) => ev.caught || ev.stuckNow).caught);
+  assert.equal(b.state, 'circle');
+});
+test('with three rings, a lizard that waits in a ring not yet struck is caught there', () => {
+  const b = triple(), p = liz(0, 0);
+  b.emerge();
+  until(b, p, (_e, bb) => bb.state === 'dive');
+  p.pos.set(b.rings[2].position.x, 0, b.rings[2].position.z); // step into the last ring: the first two miss
+  const e = until(b, p, (ev) => ev.caught || ev.stuckNow);
+  assert.ok(e.caught);
+});
+test('with three rings, the hop between strikes cannot hurt', () => {
+  const b = triple(), p = liz(0, 0);
+  b.emerge();
+  until(b, p, (_e, bb) => bb.state === 'dive');
+  p.pos.x = 30;
+  until(b, p, (e) => e.struck);
+  p.pos.copy(b.pos); // right on top of it as it lifts off
+  assert.equal(b.update(1 / 60, p, true).caught, null);
+});
+test('with three rings, a dropped tail still gets one dive, at the tail', () => {
+  const b = triple(), p = liz(0, 0);
+  b.emerge();
+  until(b, p, (_e, bb) => bb.state === 'windup');
+  assert.equal(b.baitWith(new THREE.Vector3(6, 0, 0)), true);
+  b.update(1 / 60, p, true);
+  assert.equal(shown(b).length, 1);
+  p.pos.x = -20;
+  const e = until(b, p, (ev) => ev.struck || ev.stuckNow);
+  assert.ok(e.stuckNow);
+  assert.ok(Math.hypot(b.pos.x - 6, b.pos.z) < 0.5);
 });

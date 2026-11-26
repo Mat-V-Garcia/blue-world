@@ -216,7 +216,7 @@ async function init() {
   tarantulas.spiders.forEach((s) => flip.markUnflipped(scene, s.v.root)); // enemies go red and black instead
   if (boss) {
     flip.markUnflipped(scene, boss.rig); // ...and so does the boss
-    if (world.boss.kind === 'falcon' && boss.ring) flip.markUnflipped(scene, boss.ring); // its dive ring stays red
+    if (world.boss.kind === 'falcon') boss.rings?.forEach((r) => flip.markUnflipped(scene, r)); // its dive rings stay red
   }
   reset();
   state = 'title';
@@ -373,6 +373,7 @@ function bossFrame(dt, playing) {
     if (!ev.defeated) toast('Got it!');
   }
   if (ev.bounced) { bounce(); sfx.jump(); toast(world.boss.text.wait); }
+  if (ev.struck) { sfx.stuck(); dust.puff(ev.struck, 8, 1.5); } // the falcon hit a ring and is off to the next
   if (ev.stuckNow) {
     sfx.stuck();
     if (ev.bonked) { toast('Bonk!'); dust.puff(boss.pos, 8, 1.5); }

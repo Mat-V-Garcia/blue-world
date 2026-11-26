@@ -14,10 +14,11 @@ export const FALCON = {
   BODY_R: 1.6,          // landing radius while it is down
   BACK_STUCK: 0.9,      // back height while it is down (reachable by a jump)
   TAIL_RANGE: 25, ANGRY_BELOW: 0.5, ANGRY: 0.7, // angry: circling and hovering take 0.7 as long
-  // LEAD: how much it aims ahead of a moving lizard. 0 = at where the lizard is (running in
-  // a straight line is enough to dodge); 1 = right where a lizard that keeps going will be
-  // (it has to swerve or stop when the dive starts). The ring shows the spot either way.
-  LEAD: 0,
+  // RINGS: how many spots it strikes. 1 = one dive at the lizard. More = that many rings
+  // circle close round the lizard while it hovers (RING_R from it, turning at RING_SPIN),
+  // stop when it dives, and it strikes each in turn, hopping HOP high between them. Only
+  // after the last one is it down on the ground.
+  RINGS: 1, RING_R: 1.6, RING_SPIN: 2.2, HOP: 6,
 };
 
 // makeModel(): { root, update(dt, speed, mode) } (the falcon model, or the simple stand-in).
@@ -36,29 +37,42 @@ export function createFalcon(scene, colliders, makeModel, cfg = {}) {
     m.visible = false; scene.add(m); return m;
   };
   const shadow = flat(new THREE.CircleGeometry(1.4, 20), 0x000000, 0.3);
-  const ring = flat(new THREE.RingGeometry(B.CATCH_R - 0.25, B.CATCH_R, 28), 0xe0342a, 0.85);
+  const N = Math.max(1, Math.round(B.RINGS));
+  const rings = Array.from({ length: N }, () => flat(new THREE.RingGeometry(B.CATCH_R - 0.25, B.CATCH_R, 28), 0xe0342a, 0.85));
+  // where each ring is (the spots it will strike), how many are in use, and which is next
+  const spots = rings.map(() => new THREE.Vector3());
+  let count = 1, idx = 0, spin = 0;
 
   const perch = cfg.perch ?? { x: 0, y: 12, z: 0 };
   const boss = {
     pos: new THREE.Vector3(), yaw: 0, health: 0, maxHealth: cfg.health ?? B.HEALTH,
     state: 'hidden', bodyR: B.BODY_R, rig,
-    ring, // (main.js keeps it red in the inverted level)
+    rings, // (main.js keeps them red in the inverted level)
   };
   let timer = 0, orbit = 0, speed = 0, bait = null, pendingWindup = false;
   const tgt = new THREE.Vector3(), dir = new THREE.Vector3(), tmp = new THREE.Vector3();
   let len = 0, travelled = 0;
   let pose = { rx: 0, rz: 0, sy: 1 };
-  // how fast the lizard is moving over the ground (for aiming ahead of it)
-  const last = new THREE.Vector3(), vel = new THREE.Vector2();
-  let seen = false;
-  // where to dive: the lizard, or ahead of it by as far as it will get while the dive is on its way
-  const aim = (player) => {
+  // where it will strike: the lizard itself, or the rings circling round it
+  const aim = (player, dt = 0) => {
     const p = player.pos;
-    tgt.copy(p);
-    if (!B.LEAD) return;
-    const t = tmp.subVectors(p, boss.pos).length() / B.DIVE_SPEED * B.LEAD;
-    const [x, z] = clampToWorld(p.x + vel.x * t, p.z + vel.y * t, 1);
-    tgt.set(x, Math.max(p.y, terrainHeight(x, z)), z);
+    count = N;
+    if (N === 1) { spots[0].copy(p); return; }
+    spin += B.RING_SPIN * dt;
+    for (let i = 0; i < N; i++) {
+      const a = spin + (i / N) * Math.PI * 2;
+      const [x, z] = clampToWorld(p.x + Math.sin(a) * B.RING_R, p.z + Math.cos(a) * B.RING_R, 0.5);
+      spots[i].set(x, Math.max(p.y, terrainHeight(x, z)), z);
+    }
+  };
+  // start the dive at the next spot from wherever it is now
+  const dive = () => {
+    tgt.copy(spots[idx]);
+    dir.subVectors(tgt, boss.pos);
+    len = dir.length() || 1; dir.divideScalar(len);
+    travelled = 0;
+    if (Math.hypot(dir.x, dir.z) > 0.01) boss.yaw = Math.atan2(dir.x, dir.z);
+    boss.state = 'dive';
   };
 
   const angry = () => boss.health / boss.maxHealth < B.ANGRY_BELOW;
@@ -90,7 +104,7 @@ export function createFalcon(scene, colliders, makeModel, cfg = {}) {
     const want = s === 'windup' ? { rx: -0.4, rz: 0, sy: 1 }
       : s === 'dive' ? { rx: Math.asin(Math.min(1, Math.max(-1, -dir.y))), rz: 0, sy: 1 }
         : s === 'stuck' ? { rx: 0.25, rz: 0, sy: 0.45 }
-          : s === 'circle' ? { rx: 0, rz: 0.3, sy: 1 }
+          : s === 'circle' || s === 'hop' ? { rx: 0, rz: 0.3, sy: 1 }
             : { rx: 0, rz: 0, sy: 1 };
     const k = Math.min(1, dt * 9);
     pose.rx += (want.rx - pose.rx) * k; pose.rz += (want.rz - pose.rz) * k; pose.sy += (want.sy - pose.sy) * k;
@@ -105,9 +119,13 @@ export function createFalcon(scene, colliders, makeModel, cfg = {}) {
       shadow.position.set(boss.pos.x, g + 0.05, boss.pos.z);
       shadow.scale.setScalar(Math.max(0.35, 1 - (boss.pos.y - g) / 30));
     }
-    ring.visible = s === 'windup' || s === 'dive';
-    if (ring.visible) ring.position.set(tgt.x, tgt.y + 0.06, tgt.z);
-    const flying = s === 'circle' || s === 'windup' || s === 'defeated';
+    // a ring for every spot it has not struck yet
+    const marking = s === 'windup' || s === 'dive' || s === 'hop';
+    rings.forEach((r, i) => {
+      r.visible = marking && i >= idx && i < count;
+      if (r.visible) r.position.set(spots[i].x, spots[i].y + 0.06, spots[i].z);
+    });
+    const flying = s === 'circle' || s === 'windup' || s === 'hop' || s === 'defeated';
     v.update(dt, speed / 2.5, s === 'dive' ? 'dive' : flying ? 'fly' : undefined);
   }
 
@@ -116,7 +134,7 @@ export function createFalcon(scene, colliders, makeModel, cfg = {}) {
     boss.yaw = cfg.yaw ?? 0; boss.health = boss.maxHealth; boss.state = 'hidden';
     timer = 0; orbit = 0; speed = 0; bait = null; pendingWindup = false;
     pose = { rx: 0, rz: 0, sy: 1 };
-    seen = false; vel.set(0, 0);
+    count = 1; idx = 0; spin = 0;
     rig.visible = true;
     place(1);
   }
@@ -134,7 +152,7 @@ export function createFalcon(scene, colliders, makeModel, cfg = {}) {
     if (boss.state !== 'circle' && boss.state !== 'windup') return false;
     if (Math.hypot(pos.x - boss.pos.x, pos.z - boss.pos.z) > B.TAIL_RANGE) return false;
     bait = pos.clone();
-    tgt.copy(bait);
+    spots[0].copy(bait); count = 1; // one dive, at the tail
     startWindup();
     return true;
   };
@@ -143,12 +161,6 @@ export function createFalcon(scene, colliders, makeModel, cfg = {}) {
     if (boss.state === 'hidden') { place(dt); return ev; }
     const px = player.pos.x, py = player.pos.y, pz = player.pos.z;
     speed = 0;
-    if (seen && dt > 0) {
-      const vx = (px - last.x) / dt, vz = (pz - last.z) / dt;
-      // a jump in position (back to the start) is not running
-      if (Math.hypot(vx, vz) < 15) vel.lerp(tmp.set(vx, vz, 0), Math.min(1, dt * 10)); else vel.set(0, 0);
-    }
-    last.copy(player.pos); seen = true;
 
     if (boss.state === 'circle') {
       orbit += B.ORBIT_SPIN * dt;
@@ -156,19 +168,18 @@ export function createFalcon(scene, colliders, makeModel, cfg = {}) {
       flyTo(px + Math.sin(orbit) * B.ORBIT_R, wy, pz + Math.cos(orbit) * B.ORBIT_R, dt);
       // the wait only counts once it is up there and near enough to dive
       if (boss.pos.y >= wy - 2 && Math.hypot(px - boss.pos.x, pz - boss.pos.z) < 16) timer -= dt;
-      if (timer <= 0) { aim(player); startWindup(); }
+      if (timer <= 0) { idx = 0; aim(player); startWindup(); }
     } else if (boss.state === 'windup') {
-      // hovers, following the lizard with its eyes; the spot is fixed when the dive starts
-      if (!bait) aim(player);
-      faceTo(tgt.x, tgt.z, dt);
+      // hovers, following the lizard with its eyes; the spots are fixed when the dive starts
+      if (!bait) aim(player, dt);
+      faceTo(bait ? bait.x : px, bait ? bait.z : pz, dt);
       timer -= dt;
-      if (timer <= 0) {
-        dir.subVectors(tgt, boss.pos);
-        len = dir.length() || 1; dir.divideScalar(len);
-        travelled = 0;
-        if (Math.hypot(dir.x, dir.z) > 0.01) boss.yaw = Math.atan2(dir.x, dir.z);
-        boss.state = 'dive';
-      }
+      if (timer <= 0) { idx = 0; dive(); }
+    } else if (boss.state === 'hop') {
+      // between strikes: up over the next ring (harmless on the way), then straight down on it
+      const s = spots[idx];
+      flyTo(s.x, s.y + B.HOP, s.z, dt);
+      if (boss.pos.distanceTo(tmp.set(s.x, s.y + B.HOP, s.z)) < 0.3) dive();
     } else if (boss.state === 'dive') {
       const step = Math.min(B.DIVE_SPEED * (angry() ? 1.15 : 1) * dt, len - travelled);
       boss.pos.addScaledVector(dir, step); travelled += step;
@@ -190,9 +201,11 @@ export function createFalcon(scene, colliders, makeModel, cfg = {}) {
         ev.bonked = true;
         down(ev, B.BONK);
       } else if (travelled >= len - 1e-6 || p.y <= g) {
-        // missed: sprawled where it hit (the ground, or the roof the lizard stood on)
+        // missed: on to the next ring if there is one...
         p.y = Math.max(p.y, g);
-        down(ev, B.STUCK_MIN + (B.STUCK_MAX - B.STUCK_MIN) * (boss.health - 1) / Math.max(1, boss.maxHealth - 1));
+        if (idx < count - 1) { idx++; boss.state = 'hop'; ev.struck = p.clone(); }
+        // ...or sprawled where it hit (the ground, or the roof the lizard stood on)
+        else down(ev, B.STUCK_MIN + (B.STUCK_MAX - B.STUCK_MIN) * (boss.health - 1) / Math.max(1, boss.maxHealth - 1));
       }
     } else if (boss.state === 'stuck') {
       timer -= dt;

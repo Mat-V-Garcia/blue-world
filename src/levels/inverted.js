@@ -24,7 +24,7 @@ export const FACTORS = {
   falcon: {
     FLY: 1.2, DIVE_SPEED: 1.2,
     CIRCLE_TIME: 0.8, WINDUP: 0.85,
-    STUCK_MAX: 0.65, STUCK_MIN: 0.65,
+    STUCK_MAX: 0.75, STUCK_MIN: 0.75,
   },
   cat: {
     STALK: 1.2, TROT: 1.2,
@@ -33,10 +33,10 @@ export const FACTORS = {
   },
 };
 // Numbers set outright instead of multiplied.
-// The falcon aims ahead of a running lizard (LEAD), so running in a straight line no longer
-// dodges it: you have to swerve or stop when it dives. Its ring is a little wider too.
+// The falcon strikes three times: three rings circle round the lizard while it hovers,
+// stop when it dives, and it hits each in turn. Only after the third is it on the ground.
 export const SET = {
-  falcon: { LEAD: 0.9, CATCH_R: 2.1 },
+  falcon: { RINGS: 3 },
 };
 const BASE = { tarantula: BOSS, falcon: FALCON, cat: CAT };
 const round = (n) => Math.round(n * 100) / 100;
