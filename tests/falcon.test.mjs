@@ -171,3 +171,43 @@ test('tune overrides the falcon\'s numbers (the inverted level uses this)', asyn
   assert.equal(f.maxHealth, 8);
   assert.equal(createFalcon(new THREE.Scene(), [], model, {}).bodyR, FALCON.BODY_R);
 });
+
+// ---- aiming ahead (the inverted falcon) ----
+const leading = () => {
+  setGround({ height: () => 0, radius: 66 });
+  return createFalcon(scene, [], model, { perch: { x: -20, y: 30, z: 20 }, tune: { LEAD: 0.9 } });
+};
+// the lizard runs along +x at `v` until the dive starts, then does `after(p)` each step
+const runThen = (b, p, v, after) => {
+  for (let i = 0; i < 20 * 60; i++) {
+    if (b.state === 'dive') after(p); else p.pos.x += v / 60;
+    if (p.pos.x > 40) p.pos.x -= 80; // stay inside the level (a jump in position, ignored by its aim)
+    const e = b.update(1 / 60, p, true);
+    if (e.caught || e.stuckNow) return e;
+  }
+  assert.fail('never dived');
+};
+test('without LEAD, a lizard that just keeps walking is missed', () => {
+  const b = make(), p = liz(0, 0);
+  b.emerge();
+  assert.ok(runThen(b, p, 5.5, (q) => { q.pos.x += 5.5 / 60; }).stuckNow);
+});
+test('with LEAD, a lizard that keeps going in a straight line is caught, walking or sprinting', () => {
+  for (const v of [5.5, 10]) {
+    const b = leading(), p = liz(0, 0);
+    b.emerge();
+    assert.ok(runThen(b, p, v, (q) => { q.pos.x += v / 60; }).caught, `at speed ${v}`);
+  }
+});
+test('with LEAD, a sprinting lizard that stops or turns back when it dives is missed', () => {
+  for (const turn of [0, -10]) {
+    const b = leading(), p = liz(0, 0);
+    b.emerge();
+    assert.ok(runThen(b, p, 10, (q) => { q.pos.x += turn / 60; }).stuckNow, `then ${turn}`);
+  }
+});
+test('with LEAD, a lizard that stands still is still caught where it stands', () => {
+  const b = leading(), p = liz(0, 0);
+  b.emerge();
+  assert.ok(until(b, p, (ev) => ev.caught || ev.stuckNow).caught);
+});

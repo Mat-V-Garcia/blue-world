@@ -14,6 +14,10 @@ export const FALCON = {
   BODY_R: 1.6,          // landing radius while it is down
   BACK_STUCK: 0.9,      // back height while it is down (reachable by a jump)
   TAIL_RANGE: 25, ANGRY_BELOW: 0.5, ANGRY: 0.7, // angry: circling and hovering take 0.7 as long
+  // LEAD: how much it aims ahead of a moving lizard. 0 = at where the lizard is (running in
+  // a straight line is enough to dodge); 1 = right where a lizard that keeps going will be
+  // (it has to swerve or stop when the dive starts). The ring shows the spot either way.
+  LEAD: 0,
 };
 
 // makeModel(): { root, update(dt, speed, mode) } (the falcon model, or the simple stand-in).
@@ -44,6 +48,18 @@ export function createFalcon(scene, colliders, makeModel, cfg = {}) {
   const tgt = new THREE.Vector3(), dir = new THREE.Vector3(), tmp = new THREE.Vector3();
   let len = 0, travelled = 0;
   let pose = { rx: 0, rz: 0, sy: 1 };
+  // how fast the lizard is moving over the ground (for aiming ahead of it)
+  const last = new THREE.Vector3(), vel = new THREE.Vector2();
+  let seen = false;
+  // where to dive: the lizard, or ahead of it by as far as it will get while the dive is on its way
+  const aim = (player) => {
+    const p = player.pos;
+    tgt.copy(p);
+    if (!B.LEAD) return;
+    const t = tmp.subVectors(p, boss.pos).length() / B.DIVE_SPEED * B.LEAD;
+    const [x, z] = clampToWorld(p.x + vel.x * t, p.z + vel.y * t, 1);
+    tgt.set(x, Math.max(p.y, terrainHeight(x, z)), z);
+  };
 
   const angry = () => boss.health / boss.maxHealth < B.ANGRY_BELOW;
   const pace = () => (angry() ? B.ANGRY : 1);
@@ -100,6 +116,7 @@ export function createFalcon(scene, colliders, makeModel, cfg = {}) {
     boss.yaw = cfg.yaw ?? 0; boss.health = boss.maxHealth; boss.state = 'hidden';
     timer = 0; orbit = 0; speed = 0; bait = null; pendingWindup = false;
     pose = { rx: 0, rz: 0, sy: 1 };
+    seen = false; vel.set(0, 0);
     rig.visible = true;
     place(1);
   }
@@ -126,6 +143,12 @@ export function createFalcon(scene, colliders, makeModel, cfg = {}) {
     if (boss.state === 'hidden') { place(dt); return ev; }
     const px = player.pos.x, py = player.pos.y, pz = player.pos.z;
     speed = 0;
+    if (seen && dt > 0) {
+      const vx = (px - last.x) / dt, vz = (pz - last.z) / dt;
+      // a jump in position (back to the start) is not running
+      if (Math.hypot(vx, vz) < 15) vel.lerp(tmp.set(vx, vz, 0), Math.min(1, dt * 10)); else vel.set(0, 0);
+    }
+    last.copy(player.pos); seen = true;
 
     if (boss.state === 'circle') {
       orbit += B.ORBIT_SPIN * dt;
@@ -133,10 +156,10 @@ export function createFalcon(scene, colliders, makeModel, cfg = {}) {
       flyTo(px + Math.sin(orbit) * B.ORBIT_R, wy, pz + Math.cos(orbit) * B.ORBIT_R, dt);
       // the wait only counts once it is up there and near enough to dive
       if (boss.pos.y >= wy - 2 && Math.hypot(px - boss.pos.x, pz - boss.pos.z) < 16) timer -= dt;
-      if (timer <= 0) { tgt.set(px, py, pz); startWindup(); }
+      if (timer <= 0) { aim(player); startWindup(); }
     } else if (boss.state === 'windup') {
       // hovers, following the lizard with its eyes; the spot is fixed when the dive starts
-      if (!bait) tgt.set(px, py, pz);
+      if (!bait) aim(player);
       faceTo(tgt.x, tgt.z, dt);
       timer -= dt;
       if (timer <= 0) {

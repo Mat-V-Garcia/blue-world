@@ -24,13 +24,19 @@ export const FACTORS = {
   falcon: {
     FLY: 1.2, DIVE_SPEED: 1.2,
     CIRCLE_TIME: 0.8, WINDUP: 0.85,
-    STUCK_MAX: 0.75, STUCK_MIN: 0.75,
+    STUCK_MAX: 0.65, STUCK_MIN: 0.65,
   },
   cat: {
     STALK: 1.2, TROT: 1.2,
     SWIPE_WINDUP: 0.85, CROUCH: 0.85, POUNCE_CD: 0.8,
     FLOP: 0.75, PLAY: 0.75,
   },
+};
+// Numbers set outright instead of multiplied.
+// The falcon aims ahead of a running lizard (LEAD), so running in a straight line no longer
+// dodges it: you have to swerve or stop when it dives. Its ring is a little wider too.
+export const SET = {
+  falcon: { LEAD: 0.9, CATCH_R: 2.1 },
 };
 const BASE = { tarantula: BOSS, falcon: FALCON, cat: CAT };
 const round = (n) => Math.round(n * 100) / 100;
@@ -51,6 +57,7 @@ export function harderBoss(boss) {
   const kind = boss.kind ?? 'tarantula', base = BASE[kind];
   const tune = { ...boss.tune };
   for (const [k, f] of Object.entries(FACTORS[kind])) tune[k] = round((tune[k] ?? base[k]) * f);
+  Object.assign(tune, SET[kind]);
   return { ...boss, health: (boss.health ?? base.HEALTH) + EXTRA_HEALTH, tune };
 }
 

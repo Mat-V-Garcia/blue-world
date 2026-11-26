@@ -40,6 +40,8 @@ test('every boss takes two more hits, moves faster and gives a shorter opening',
   const f = harderBoss({ kind: 'falcon', health: 6 });
   assert.equal(f.health, 8);
   assert.ok(f.tune.DIVE_SPEED > FALCON.DIVE_SPEED && f.tune.STUCK_MAX < FALCON.STUCK_MAX && f.tune.WINDUP < FALCON.WINDUP);
+  assert.ok(f.tune.LEAD > 0.5 && f.tune.CATCH_R > FALCON.CATCH_R); // it aims ahead of a running lizard
+  assert.equal(FALCON.LEAD, 0);                                   // the regular falcon does not
 
   const c = harderBoss(CAT_BOSS);
   assert.equal(c.health, 8);
