@@ -23,7 +23,7 @@ export const CAT = {
 };
 const REST = 1.0; // stands still this long after catching the lizard
 
-// makeModel(): { root, update(dt, speed, state) }, 1 unit long, facing +Z.
+// makeModel(): { root, update(dt, speed, state, { pace, look }) }, 1 unit long, facing +Z.
 // cfg: { x, z, health?, scale?, emergeFrom? (height she drops in from), tune? (overrides for CAT) }
 export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
   const C = { ...CAT, ...cfg.tune }, SCALE = cfg.scale ?? 6.5, FROM = cfg.emergeFrom ?? 9;
@@ -48,6 +48,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
   let timer = 0, rest = 0, speed = 0, stalkT = 0, pending = null;
   let pounceCD = 0, air = 0, second = false; // air: 0..1 through a leap; second: the sleepy follow-up pounce
   let grace = 0;                             // just got up: her side can't hurt for this long
+  let heading = 0, aim = 0;                  // the way she last walked; the way a paw or a pounce is aimed
   const from = new THREE.Vector2(), target = new THREE.Vector2();
   let bait = null;                           // the dropped tail she is after
   // getting round furniture: which way she slides along it, and how long she has gone nowhere
@@ -62,11 +63,11 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     const g = terrainHeight(p.pos.x, p.pos.z);
     return colliders.some((c) => c.bottom >= p.pos.y + 0.3 && c.bottom - g <= C.LOW_ROOF && footprint(c, p.pos.x, p.pos.z).dist <= 0);
   };
-  const turnTo = (x, z, dt) => {
-    let d = Math.atan2(x - cat.pos.x, z - cat.pos.z) - cat.yaw;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    cat.yaw += d * Math.min(1, dt * 6);
+  const turn = (to, dt, rate = 6) => {
+    const d = Math.atan2(Math.sin(to - cat.yaw), Math.cos(to - cat.yaw));
+    cat.yaw += d * Math.min(1, dt * rate);
   };
+  const turnTo = (x, z, dt) => turn(Math.atan2(x - cat.pos.x, z - cat.pos.z), dt);
   // one step in direction (ux, uz), sliding round anything too tall to step over
   function step(ux, uz, pace, dt) {
     const len = pace * dt;
@@ -82,6 +83,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     }
     [nx, nz] = clampToWorld(nx, nz, C.BODY_R);
     speed = Math.hypot(nx - cat.pos.x, nz - cat.pos.z) / Math.max(dt, 1e-4);
+    if (speed > 0.2) heading = Math.atan2(nx - cat.pos.x, nz - cat.pos.z);
     cat.pos.x = nx; cat.pos.z = nz;
   }
   const stalk = (pause = 0) => { cat.state = 'stalk'; rest = pause; stalkT = 0; ring.visible = false; stuckT = 0; tries = 0; nearest = Infinity; };
@@ -110,7 +112,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     const k = Math.min(1, (hop ? Math.min(C.POUNCE_MAX, Math.max(0, d - C.SWIPE_RANGE)) : C.POUNCE_MAX) / d); // a hop stops short of the lizard
     const [tx, tz] = clampToWorld(cat.pos.x + dx * k, cat.pos.z + dz * k, C.BODY_R);
     target.set(tx, tz);
-    cat.yaw = Math.atan2(dx, dz);
+    aim = Math.atan2(dx, dz);
     cat.state = 'crouch'; timer = secs; pending = 'pounce';
     ring.position.set(tx, terrainHeight(tx, tz) + 0.06, tz); ring.visible = true;
   }
@@ -157,7 +159,6 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
       timer -= dt;
       if (timer <= 0) stalk();
     } else if (cat.state === 'stalk') {
-      turnTo(px, pz, dt);
       stalkT += dt;
       if (rest > 0) rest -= dt;
       else if (hid) {
@@ -169,7 +170,7 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
         if (d > C.CIRCLE_R - 1) walk(dx / d, dz / d, C.STALK, dt, px, pz);
       } else if (d <= C.SWIPE_RANGE) {
         cat.state = 'swipeWind'; timer = C.SWIPE_WINDUP; pending = 'swipe';
-        cat.yaw = Math.atan2(dx, dz); // the paw goes where she is looking now
+        aim = Math.atan2(dx, dz); // the paw goes where the lizard is now
       } else if (pounceCD <= 0 && d >= C.POUNCE_MIN && d <= C.POUNCE_MAX && high < 1) {
         second = false; hop = false;
         if (sleepy()) { cat.state = 'yawn'; timer = C.YAWN; ev.yawnNow = true; } else crouch(px, pz, C.CROUCH);
@@ -181,7 +182,10 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
         const n = Math.hypot(ux, uz) || 1;
         walk(ux / n, uz / n, d > C.POUNCE_MAX + 4 ? C.TROT : C.STALK, dt, px, pz); // she trots to catch up from right across the yard
       }
+      // her body points the way she walks (her head watches the lizard); standing, she turns to face it
+      if (cat.state === 'stalk') { if (speed > 0.2) turn(heading, dt, 8); else turnTo(px, pz, dt); }
     } else if (cat.state === 'swipeWind') {
+      turn(aim, dt, 14);
       timer -= dt;
       if (timer <= 0) { cat.state = 'swipe'; timer = C.SWIPE_TIME; }
     } else if (cat.state === 'swipe') {
@@ -198,9 +202,10 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
       timer -= dt;
       if (timer <= 0) crouch(px, pz, C.CROUCH);
     } else if (cat.state === 'crouch') {
+      turn(aim, dt, 12);
       timer -= dt;
       if (hid && !hop) stalk();
-      else if (timer <= 0) { cat.state = 'pounce'; air = 0; from.set(cat.pos.x, cat.pos.z); }
+      else if (timer <= 0) { cat.state = 'pounce'; air = 0; from.set(cat.pos.x, cat.pos.z); cat.yaw = Math.atan2(target.x - cat.pos.x, target.y - cat.pos.z); }
     } else if (cat.state === 'pounce') {
       air = Math.min(1, air + dt / C.AIR);
       cat.pos.x = from.x + (target.x - from.x) * air; cat.pos.z = from.y + (target.y - from.y) * air;
@@ -267,7 +272,9 @@ export function createMamaCat(scene, colliders, makeModel, cfg = {}) {
     if (now === 'pounce') rig.position.y += C.ARC * Math.sin(Math.PI * air);
     rig.rotation.y = cat.yaw;
     tilt.rotation.z = pose.roll; tilt.scale.y = pose.sy;
-    v.update(dt, speed / C.STALK, now);
+    // speed as a share of her stalking pace (what the kitten stand-in expects), then the real
+    // pace in world units and the angle from her nose round to the lizard
+    v.update(dt, speed / C.STALK, now, { pace: speed, look: Math.atan2(Math.sin(Math.atan2(px - cat.pos.x, pz - cat.pos.z) - cat.yaw), Math.cos(Math.atan2(px - cat.pos.x, pz - cat.pos.z) - cat.yaw)) });
     return ev;
   };
   return cat;

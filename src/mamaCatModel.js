@@ -13,6 +13,24 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 //   hind legs    tripo1_Right_Limb_1..3 and bone_54..56 (hip, knee, paw), both under tripo1_Right_Limb_0
 //   tail         bone_57, bone_58, tripoTail_0..3, bone_63, bone_64
 const UP = new THREE.Vector3(0, 1, 0);
+const LOOK = 1; // which way a turn about UP swings her head on this rig (checked by eye)
+
+// Magnific's mesh carries a few hundred stray faces that point inwards (their winding
+// disagrees with their own normals). They show as pale, oddly lit patches that look like
+// holes in her coat; the real surface is intact underneath, so they are simply dropped.
+function dropInsideOutFaces(geo) {
+  const P = geo.attributes.position, N = geo.attributes.normal, I = geo.index;
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3(), face = new THREE.Vector3();
+  const keep = [];
+  for (let t = 0; t < I.count; t += 3) {
+    const i = I.getX(t), j = I.getX(t + 1), k = I.getX(t + 2);
+    a.fromBufferAttribute(P, i); b.fromBufferAttribute(P, j); c.fromBufferAttribute(P, k);
+    face.crossVectors(b.sub(a), c.sub(a));
+    n.fromBufferAttribute(N, i).add(a.fromBufferAttribute(N, j)).add(a.fromBufferAttribute(N, k));
+    if (face.dot(n) >= 0) keep.push(i, j, k);
+  }
+  geo.setIndex(keep);
+}
 
 export async function loadMamaCatModel(url = '/assets/mamacat.glb') {
   const gltf = await new GLTFLoader().loadAsync(url);
@@ -29,6 +47,7 @@ export async function loadMamaCatModel(url = '/assets/mamacat.glb') {
     o.castShadow = true;
     o.frustumCulled = false; // skinned bounds don't follow the bones
     o.material.metalness = 0; o.material.roughness = 0.85;
+    dropInsideOutFaces(o.geometry);
     const pos = o.geometry.attributes.position;
     for (let i = 0; i < pos.count; i += 7) { const k = p.fromBufferAttribute(pos, i).dot(FWD); lo = Math.min(lo, k); hi = Math.max(hi, k); }
   });
@@ -71,15 +90,26 @@ export async function loadMamaCatModel(url = '/assets/mamacat.glb') {
     const leg = ([upper, lower], swing, bend = 0, out = 0) => { pose(upper, [[SIDE, -swing], [FWD, out]]); pose(lower, [[SIDE, bend]]); };
 
     const LIE = 0.27; // how far her body drops when she lies down (her legs are about this long)
-    let phase = 0, t = Math.random() * 10;
+    const LEG = 0.3;  // leg length as a share of her body length: sets how far each step carries her
+    // A cat's walk is four beats, one paw at a time: left hind, left fore, right hind, right
+    // fore, each a quarter of a stride after the last, with each paw on the ground about
+    // two thirds of the time. As she speeds up into a trot the diagonal pairs close up and
+    // move together, half the time in the air. [hind left, fore left, hind right, fore right]
+    const WALK = [0, 0.25, 0.5, 0.75], TROT = [0, 0.5, 0.5, 1.0];
+    const smooth = (x) => x * x * (3 - 2 * x);
+    // where one paw is in its step: swing (+ forward of the shoulder or hip, - behind) and how far it is lifted
+    function paw(u, duty, reach) {
+      if (u < duty) return { swing: reach * (1 - 2 * u / duty), lift: 0 };  // on the ground, carried back under her
+      const k = (u - duty) / (1 - duty);
+      return { swing: reach * (2 * smooth(k) - 1), lift: Math.sin(Math.PI * k) }; // picked up and brought forward
+    }
+    let stride = 0, t = Math.random() * 10; // stride: how many whole strides she has taken
     const w = {}; // how much of each pose is showing, 0..1, eased
     const ease = (key, on, dt, rate = 9) => (w[key] = THREE.MathUtils.lerp(w[key] ?? 0, on ? 1 : 0, Math.min(1, dt * rate)));
     return {
       root,
-      update(dt, speed, state) {
+      update(dt, speed, state, { pace = speed * 3.2, look = 0 } = {}) {
         t += dt;
-        const g = Math.min(1.6, speed);
-        phase += dt * (2.5 + g * 5);
         const stalk = ease('stalk', state === 'stalk', dt, 4);
         const lift = ease('lift', state === 'swipeWind', dt, 12);
         const swipe = ease('swipe', state === 'swipe', dt, 30);
@@ -91,31 +121,46 @@ export async function loadMamaCatModel(url = '/assets/mamacat.glb') {
         const yawn = ease('yawn', state === 'yawn', dt, 5);
         const asleep = ease('asleep', state === 'defeated', dt, 1.5);
         const low = Math.max(bat, asleep); // lying on her front
+        const walking = state === 'stalk' || state === 'trot';
+        const go = ease('go', walking && pace > 0.3, dt, 7); // 0 standing .. 1 stepping out
 
-        // legs: a diagonal walk; stretched out in a leap; out in front when lying; loose when flopped
-        const s = Math.sin(phase) * 0.55 * Math.min(1, g) * (1 - leap) * (1 - low);
+        // the stride keeps time with the ground she covers, so her paws don't slide
+        const trot = ease('trotting', pace > 4.6, dt, 5);
+        const duty = 0.66 - 0.16 * trot, reach = 0.36 + 0.14 * trot;
+        const perStride = (2 * LEG * Math.sin(reach) / duty) * root.scale.x; // world units per whole stride
+        if (walking) stride += dt * pace / perStride;
+        const step = (i) => { const u = stride + WALK[i] + (TROT[i] - WALK[i]) * trot; return paw(u - Math.floor(u), duty, reach * go); };
+        const [hl, fl, hr, fr] = [0, 1, 2, 3].map(step);
+        const up = go * (1 - leap) * (1 - low); // how much of the walk shows through the other poses
+
+        // legs: the walk; stretched out in a leap; out in front when lying; loose when flopped
         const batting = bat * (Math.sin(t * 12) * 0.35 - 0.5); // one paw lifts off the ground and pats
-        const reach = leap * 1.0 + low * 1.4 + flop * 0.3;
-        leg(frontR, s + reach + lift * 1.5 + swipe * 0.9 + batting, Math.max(0, -s) * 0.7 + lift * 0.9, -swipe * 0.9);
-        leg(frontL, -s + reach, Math.max(0, s) * 0.7);
-        leg(hindL, s - leap * 0.9 + crouch * 0.5 + low * 1.4 - flop * 0.3, Math.max(0, -s) * 0.6);
-        leg(hindR, -s - leap * 0.9 + crouch * 0.5 + low * 1.4 - flop * 0.3, Math.max(0, s) * 0.6);
-        turn.position.y = -low * LIE; // belly on the ground
+        const out = leap * 1.0 + low * 1.4 + flop * 0.3;
+        const back = -leap * 0.9 + crouch * 0.5 + low * 1.4 - flop * 0.3;
+        // a lifted fore paw folds at the elbow and reaches; a lifted hind paw folds at the hock
+        leg(frontR, fr.swing * up + fr.lift * up * 0.12 + out + lift * 1.5 + swipe * 0.9 + batting, fr.lift * up * 0.75 + lift * 0.9, -swipe * 0.9);
+        leg(frontL, fl.swing * up + fl.lift * up * 0.12 + out, fl.lift * up * 0.75);
+        leg(hindL, hl.swing * up + hl.lift * up * 0.15 + back, hl.lift * up * 0.6);
+        leg(hindR, hr.swing * up + hr.lift * up * 0.15 + back, hr.lift * up * 0.6);
+        // her body dips a little as each pair of paws takes her weight, and lies on the ground to play or sleep
+        const cyc = stride * Math.PI * 2;
+        turn.position.y = -low * LIE - Math.abs(Math.sin(cyc)) * 0.008 * up * (1 + trot * 1.5);
 
         // back: shoulders down and a wiggle of the hips before a pounce
-        pose(hips, [[UP, crouch * Math.sin(t * 16) * 0.12]]);
+        pose(hips, [[UP, crouch * Math.sin(t * 16) * 0.12 + Math.sin(cyc) * 0.035 * up], [FWD, Math.sin(cyc) * 0.03 * up]]);
 
         // head: low and watching when stalking, shaken after a bump, thrown back in a yawn, tucked in asleep
         // (on this rig a turn about SIDE lifts the head when positive, the opposite of the legs and tail)
-        const idleLook = stalk * (1 - Math.min(1, g)) * Math.sin(t * 0.7) * 0.15;
+        // she keeps her eyes on the lizard while her body walks its own line (as far as a neck turns)
+        const watch = (stalk + yawn) * THREE.MathUtils.clamp(look, -1.1, 1.1) * LOOK;
         const nod = -stalk * 0.2 - bat * 0.45 + yawn * 0.45 - asleep * 0.75 + leap * 0.25 - crouch * 0.2;
-        pose(neck, [[SIDE, nod], [UP, idleLook + shake * Math.sin(t * 22) * 0.35]]);
-        pose(head, [[SIDE, nod * 0.5], [FWD, flop * 0.3 + yawn * Math.sin(t * 3) * 0.1]]);
+        pose(neck, [[SIDE, nod + Math.sin(cyc * 2) * 0.03 * up], [UP, watch * 0.6 + shake * Math.sin(t * 22) * 0.35]]);
+        pose(head, [[SIDE, nod * 0.5], [UP, watch * 0.4], [FWD, flop * 0.3 + yawn * Math.sin(t * 3) * 0.1]]);
 
         // tail: slow sway, quick twitch of the tip when stalking, up for a pounce, curled round asleep
         tail.forEach((b, i) => {
           const tip = i / (tail.length - 1);
-          const sway = Math.sin(t * 2 - i * 0.6) * 0.1 * (1 - asleep);
+          const sway = (Math.sin(t * 2 - i * 0.6) * 0.1 * (1 - up) + Math.sin(cyc - i * 0.5) * 0.07 * up) * (1 - asleep);
           const twitch = stalk * tip * Math.sin(t * 9 - i) * 0.18;
           pose(b, [[UP, sway + twitch + asleep * 0.42], [SIDE, -(crouch + leap) * 0.16 + flop * 0.05]]);
         });
