@@ -41,6 +41,9 @@ export const SET = {
   falcon: { RINGS: 3 },
   cat: { DOUBLE: true },
 };
+// The inverted Mama Cat's fight is in the dark: once her intro is over the lights go out,
+// and all that can be seen is the lizard, her face and the ring where she will land.
+export const DARK = { cat: true };
 const BASE = { tarantula: BOSS, falcon: FALCON, cat: CAT };
 const round = (n) => Math.round(n * 100) / 100;
 
@@ -63,7 +66,7 @@ export function harderBoss(boss) {
   const tune = {};
   for (const [k, f] of Object.entries(FACTORS[kind])) tune[k] = round(base[k] * f);
   Object.assign(tune, SET[kind]);
-  return { ...boss, health: (boss.health ?? base.HEALTH) + EXTRA_HEALTH, tune };
+  return { ...boss, health: (boss.health ?? base.HEALTH) + EXTRA_HEALTH, tune, ...(DARK[kind] && { dark: true }) };
 }
 
 // What a level's build() returned, with its enemies and its boss made harder.

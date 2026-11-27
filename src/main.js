@@ -19,7 +19,7 @@ import { createMamaCat } from './mamaCat.js';
 import { loadMamaCatModel } from './mamaCatModel.js';
 import { createFalcon } from './falcon.js';
 import { createStorm, stormLevel } from './storm.js';
-import { createFlip, createRedSkin } from './flip.js';
+import { createFlip, createRedSkin, faceMask } from './flip.js';
 import { INTRO, INTRO_LENGTH, introFor, introBlend, introLetsBossMove, introCamera } from './bossIntro.js';
 
 const TOTAL = 10;
@@ -228,6 +228,7 @@ async function init() {
     flip.markUnflipped(scene, boss.rig); // ...and so does the boss
     if (world.boss.kind === 'falcon') boss.rings?.forEach((r) => flip.markUnflipped(scene, r)); // its dive rings stay red
   }
+  if (boss && world.boss.dark) setupDark();
   reset();
   state = 'title';
   renderer.setAnimationLoop(loop);
@@ -255,6 +256,7 @@ function reset() {
   tarantulas?.reset();
   tail?.reset();
   closeIntro();
+  darkWant = 0; flip.dark = 0; // the lights are on until the boss's intro is over
   boss?.reset();
   storm?.reset();
   stuckTold = false;
@@ -420,6 +422,41 @@ function endIntro() {
   if (state !== 'intro') return;
   state = 'play';
   invuln = Math.max(invuln, INTRO.SAFE); // a moment of safety to get going
+  if (world.boss.dark) { darkWant = 1; toast('Lights out!'); }
+}
+
+// ---------- Lights out (the inverted Mama Cat) ----------
+// Once her intro is over the fight is in the dark: the picture goes black and only the
+// lizard (and its dropped tail), her face and the ring where she will land can be seen.
+// The lights come back when she falls asleep. Which boss gets this: ./levels/inverted.js.
+const FACE_R = 0.115;  // how much of her shows round her face, as a share of her length
+let darkWant = 0;      // 0 = lights on, 1 = dark (flip.dark eases towards it)
+let faceBones = [];
+const faceAt = new THREE.Vector3(), boneAt = new THREE.Vector3();
+function setupDark() {
+  flip.markDark(scene, lizard.root);
+  flip.markDark(scene, tail.piece);
+  flip.markDark(scene, boss.rig);
+  if (boss.ring) flip.markDark(scene, boss.ring);
+  // the small bones of her face (see ./mamaCatModel.js): their middle is the middle of her face
+  boss.rig.traverse((o) => { if (o.isBone && /^bone_([89]|[1-3]\d)$/.test(o.name)) faceBones.push(o); });
+  faceMask.r.value = FACE_R * (world.boss.scale ?? 6.5);
+  const ringMat = boss.ring?.material, ringOwn = ringMat && { color: ringMat.color.clone(), opacity: ringMat.opacity };
+  flip.onDarkPass = (on) => {
+    faceMask.on.value = on && faceBones.length ? 1 : 0; // (the stand-in model has no face bones: all of it shows)
+    if (!ringMat) return;
+    // the ring is drawn dark on the lawn; in the dark it glows instead
+    if (on) { ringMat.color.set(0xffe9b8); ringMat.opacity = 0.95; }
+    else { ringMat.color.copy(ringOwn.color); ringMat.opacity = ringOwn.opacity; }
+  };
+}
+function stepDark(dt) {
+  flip.dark = THREE.MathUtils.clamp(flip.dark + Math.sign(darkWant - flip.dark) * dt * 1.2, 0, 1);
+  if (flip.dark <= 0 || !faceBones.length) return;
+  boss.rig.updateMatrixWorld(true); camera.updateMatrixWorld();
+  faceAt.set(0, 0, 0);
+  for (const b of faceBones) faceAt.add(boneAt.setFromMatrixPosition(b.matrixWorld));
+  faceMask.at.value.copy(faceAt.divideScalar(faceBones.length)).applyMatrix4(camera.matrixWorldInverse);
 }
 function skipIntro() { if (intro && intro.t >= INTRO.SKIP_GUARD) endIntro(); }
 function stepIntro(dt) {
@@ -492,6 +529,7 @@ function bossFrame(dt, playing) {
   }
   if (ev.defeated && state === 'play') {
     state = 'win';
+    darkWant = 0; // the lights come back on
     if (!world.boss.sleeps) storm.set(0); // the sky clears (the cat sleeps on under its sunset)
     toast('You did it!');
     dust.puff(boss.pos, 30, 3);
@@ -717,9 +755,10 @@ function frame(dt) {
   sun.position.copy(lit).addScaledVector(SUN_DIR, 80);
   sun.target.position.copy(lit);
 
+  if (boss && world.boss.dark) stepDark(dt);
   flip.render(scene, camera);
 }
 
 init();
 // handy for debugging / testing in the console
-window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = v; }, set camPitch(v) { camPitch = v; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, get boss() { return boss; }, get intro() { return intro; }, skipIntro, get storm() { return storm; }, get flip() { return flip; }, setFlipped, start, frame };
+window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = v; }, set camPitch(v) { camPitch = v; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, get boss() { return boss; }, get intro() { return intro; }, faceMask, skipIntro, get storm() { return storm; }, get flip() { return flip; }, setFlipped, start, frame };

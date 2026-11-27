@@ -42,6 +42,13 @@ The inverted Mama Cat pounces twice from the start (`DOUBLE: true`): a missed po
 straight into a second one before she flops. The regular Mama Cat only does that once she
 is half tired out.
 
+Her fight is also in the dark (`DARK` in `inverted.js`, asked for by Mathew the same
+day): once her intro is over the screen goes black, and all that can be seen is the lizard
+(and its dropped tail), her face, and the ring where a pounce will land, which glows. The
+lights come back when she falls asleep, and at a restart until her intro has played again.
+The picture is blacked out after it is drawn and those few things are drawn again on top
+(`flip.js`, `markDark`); her red skin is cut down to a ball round the bones of her face.
+
 The lizard is unchanged (5 hearts, same speeds). Tarantulas and pigeons are still slower
 than a walking lizard; kittens are still slower than a sprint.
 

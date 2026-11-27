@@ -54,6 +54,8 @@ test('every boss takes two more hits, moves faster and gives a shorter opening',
   assert.equal(c.tune.STALK, 3.84);
   assert.equal(c.tune.FLOP, 1.5);
   assert.equal(c.tune.DOUBLE, true); // she pounces twice from the start
+  assert.equal(c.dark, true);        // and her fight is in the dark
+  assert.ok(!f.dark && !t.dark && !CAT_BOSS.dark); // only hers
   assert.equal(CAT.DOUBLE, false);   // the regular one only when she is sleepy
   assert.equal(c.text, CAT_BOSS.text);
 });

@@ -32,6 +32,7 @@ export function createTailDrop(scene, groundAt) {
   const hide = () => { if (shown) { scene.remove(piece); shown = false; } };
 
   const tail = {
+    piece,        // the dropped piece's model
     ready: true,
     grown: 1,     // 0 = no tail, 1 = full tail (drives how the lizard is drawn)
     pos: null,    // where the dropped tail is while it wriggles
