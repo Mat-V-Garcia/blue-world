@@ -107,3 +107,21 @@ button.secondary { background: #fff; color: #1d6fb0; box-shadow: 0 5px 0 #d79a6a
 .bossbar .fill { height: 100%; width: 100%; background: #d8343a; border-radius: 999px; transition: width .3s; }
 body.touch-mode .bossbar { width: 44%; top: calc(12px + env(safe-area-inset-top)); }
 body.boss .toast { top: 110px; }
+
+/* ---------- Boss intro (the cutscene when the boss comes out) ---------- */
+#cine { position: fixed; inset: 0; z-index: 8; pointer-events: none; overflow: hidden; }
+#cine .bar { position: absolute; left: 0; right: 0; height: 12vh; background: #0b0810; transition: transform .45s ease; }
+#cine .bar.top { top: 0; transform: translateY(-101%); }
+#cine .bar.bottom { bottom: 0; transform: translateY(101%); }
+body.cine #cine .bar { transform: none; }
+#cine .card { position: absolute; left: calc(6vw + env(safe-area-inset-left)); right: 6vw; bottom: 17vh; color: #fff; opacity: 0; transform: translateX(-24px); transition: opacity .35s, transform .35s; }
+#cine.card .card { opacity: 1; transform: none; }
+#cine-name { font-size: clamp(26px, min(6.5vw, 11vh), 84px); font-weight: 700; line-height: 1; letter-spacing: .01em; text-transform: uppercase; text-shadow: 0 4px 0 #7a2a1c, 0 0 22px #000a; }
+#cine-line { margin-top: 8px; font-size: clamp(15px, min(2.6vw, 5vh), 28px); font-weight: 600; color: #ffe9b8; text-shadow: 0 2px 0 #4a2f22, 0 0 12px #000a; }
+#cine.inverted #cine-name { color: #ff5a4a; text-shadow: 0 4px 0 #1a0d10, 0 0 22px #000; }
+#skip { position: absolute; right: calc(18px + env(safe-area-inset-right)); bottom: calc(12vh + 14px); min-width: 96px; min-height: 48px; padding: 8px 18px; font: inherit; font-size: 18px; font-weight: 700; color: #4a2f22; background: #fff6e8e6; border: 0; border-radius: 999px; box-shadow: 0 4px 0 #d79a6a; opacity: 0; transition: opacity .3s; touch-action: manipulation; }
+body.cine #skip { opacity: 1; pointer-events: auto; cursor: pointer; }
+/* the counters step aside while it plays (the line of text stays) */
+#hud .counter, #hud .hearts, #hud .tail, #hud .bossbar { transition: opacity .3s, transform .15s; }
+body.cine #hud .counter, body.cine #hud .hearts, body.cine #hud .tail, body.cine #hud .bossbar, body.cine #hud .hint { opacity: 0 !important; }
+body.cine.boss .toast { top: calc(12vh + 16px); }

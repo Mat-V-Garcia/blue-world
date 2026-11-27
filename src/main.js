@@ -20,6 +20,7 @@ import { loadMamaCatModel } from './mamaCatModel.js';
 import { createFalcon } from './falcon.js';
 import { createStorm, stormLevel } from './storm.js';
 import { createFlip, createRedSkin } from './flip.js';
+import { INTRO, INTRO_LENGTH, introFor, introBlend, introLetsBossMove, introCamera } from './bossIntro.js';
 
 const TOTAL = 10;
 const $ = (id) => document.getElementById(id);
@@ -71,6 +72,12 @@ addEventListener('resize', () => {
 const keys = {};
 let jumpPressed = false;
 addEventListener('keydown', (e) => {
+  if (intro) { // the boss intro is playing: Space or Enter skips it, nothing else happens
+    if (e.code === 'Space') e.preventDefault();
+    if (!e.repeat && (e.code === 'Space' || e.code === 'Enter')) skipIntro();
+    keys[e.code] = true;
+    return;
+  }
   if (e.code === 'Space') { if (!keys.Space) jumpPressed = true; e.preventDefault(); }
   if (e.code === 'KeyF' && !keys.KeyF) bitePressed = true;
   if (e.code === 'KeyQ' && !keys.KeyQ) tailPressed = true;
@@ -114,6 +121,8 @@ fsBtn.addEventListener('click', () => {
   else (fsTarget.requestFullscreen || fsTarget.webkitRequestFullscreen).call(fsTarget)?.catch?.(() => {});
 });
 let dragging = false;
+// a mouse click skips the boss intro (a finger uses the Skip button, so mashing the screen doesn't)
+canvas.addEventListener('pointerdown', (e) => { if (intro && e.pointerType === 'mouse') skipIntro(); });
 canvas.addEventListener('mousedown', () => {
   dragging = true;
   if (state === 'play' && document.pointerLockElement !== canvas) lockPointer();
@@ -146,6 +155,7 @@ let biteT = 0, biteCD = 0, bitePressed = false;
 let tailPressed = false, scareT = 0; // scareT: how long the current push-ups have gone on
 const KITTEN_HINT = "Kittens don't mind! Try push-ups or drop your tail";
 const camTarget = new THREE.Vector3();
+const gameCam = new THREE.Vector3(); // where the normal camera (behind the lizard) is
 const camRay = new THREE.Raycaster();
 const camDir = new THREE.Vector3();
 
@@ -244,6 +254,7 @@ function reset() {
   drawHearts();
   tarantulas?.reset();
   tail?.reset();
+  closeIntro();
   boss?.reset();
   storm?.reset();
   stuckTold = false;
@@ -358,10 +369,101 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
 }
 
+// ---------- Boss intro (boss level only) ----------
+// The short cutscene when the tenth pebble brings the boss out: the camera leaves the
+// lizard, watches the boss arrive, shows its name and glides back. While it plays the
+// state is 'intro': the lizard can't be steered and nothing can hurt it. The timing, the
+// words and the camera maths are in ./bossIntro.js.
+let intro = null; // { t, out (the boss has started to come out), aimed, shot, anchor }
+const introFocus = new THREE.Vector3(), introCam = new THREE.Vector3(), introLook = new THREE.Vector3();
+$('skip').onclick = () => skipIntro();
+
+// The boss comes out (once): its health bar and its sound.
+function bringBossOut() {
+  if (!boss.emerge()) return;
+  drawBoss();
+  if (world.boss.kind === 'falcon') sfx.screech();
+  else if (world.boss.kind === 'cat') sfx.meow();
+  else { dust.puff(boss.pos, 40, 3.5); sfx.thunder(); sfx.hiss(); }
+}
+// Turn the normal camera so the boss is ahead of the lizard when the fight starts.
+function aimAtBoss() {
+  const dx = player.pos.x - boss.pos.x, dz = player.pos.z - boss.pos.z;
+  if (Math.hypot(dx, dz) < 0.5) return;
+  camYaw = Math.atan2(dx, dz); moveBasisYaw = camYaw; lastKeyCombo = '';
+  lastMouse = t; // the camera holds there for a moment before it follows the lizard again
+}
+function startIntro() {
+  const shot = introFor(world.boss.kind);
+  intro = { t: 0, out: false, aimed: false, shot, anchor: boss.pos.clone() };
+  introFocus.set(boss.pos.x, boss.pos.y + shot.lookUp, boss.pos.z);
+  state = 'intro';
+  touch.releaseAll(); // the touch buttons hide: let go of the stick so it isn't left held
+  $('cine-name').textContent = LEVEL.name;
+  $('cine-line').textContent = LEVEL.inverted ? shot.invertedLine : shot.line;
+  $('cine').classList.toggle('inverted', !!LEVEL.inverted);
+  $('cine').classList.remove('card');
+  document.body.classList.add('cine');
+}
+// Put the screen back to normal (the bars slide away).
+function closeIntro() {
+  intro = null;
+  $('cine').classList.remove('card');
+  document.body.classList.remove('cine');
+}
+// The intro is over (it ran out, or it was skipped): the fight starts.
+function endIntro() {
+  if (!intro) return;
+  bringBossOut();
+  aimAtBoss();
+  closeIntro();
+  if (state !== 'intro') return;
+  state = 'play';
+  invuln = Math.max(invuln, INTRO.SAFE); // a moment of safety to get going
+}
+function skipIntro() { if (intro && intro.t >= INTRO.SKIP_GUARD) endIntro(); }
+function stepIntro(dt) {
+  intro.t += dt;
+  if (!intro.out) {
+    // the sand stirs where the tarantula is about to climb out
+    if (!world.boss.kind || world.boss.kind === 'tarantula') {
+      dustTick += dt;
+      if (dustTick > 0.1) { dustTick = 0; dust.puff(boss.pos, 5, 1.6); }
+    }
+    if (intro.t >= INTRO.REVEAL) { intro.out = true; bringBossOut(); }
+  }
+  $('cine').classList.toggle('card', intro.t >= INTRO.CARD && intro.t < INTRO.HOLD_END);
+  if (!intro.aimed && intro.t >= INTRO.IN) { intro.aimed = true; aimAtBoss(); } // unseen: the view is on the boss
+  if (intro.t >= INTRO_LENGTH) endIntro();
+}
+// The cutscene's picture: blend from the normal camera to the boss shot and back.
+function introView(dt) {
+  const { shot } = intro, w = introBlend(intro.t);
+  // look at the boss where it is drawn (dropping over the fence, climbing out of the sand)
+  const at = boss.state === 'hidden' ? boss.pos : boss.rig.position;
+  introLook.set(at.x, at.y + shot.lookUp, at.z);
+  introFocus.lerp(introLook, Math.min(1, dt * 5));
+  if (shot.follow) intro.anchor.lerp(boss.pos, Math.min(1, dt * 4)); // keep up with a boss that flies off
+  const c = introCamera(intro.anchor, player.pos, shot, intro.t);
+  introCam.set(c.x, Math.max(c.y, terrainHeight(c.x, c.z) + 0.5), c.z);
+  // not from behind a wall: pull in front of anything between the boss and the camera
+  camDir.subVectors(introCam, introFocus);
+  const far = camDir.length();
+  camRay.set(introFocus, camDir.normalize());
+  camRay.far = far;
+  const hit = world.solids.length ? camRay.intersectObjects(world.solids, true)[0] : null;
+  if (hit && hit.distance > 2.5) introCam.copy(introFocus).addScaledVector(camDir, hit.distance - 0.4);
+  camera.position.lerp(introCam, w);
+  camera.lookAt(introLook.lerpVectors(camTarget, introFocus, w));
+  return w;
+}
+
 // ---------- Boss fight (boss level only) ----------
 const splatGeo = new THREE.CircleGeometry(0.9, 9).rotateX(-Math.PI / 2);
 function bossFrame(dt, playing) {
   if (state === 'title') { storm.update(dt); return; } // it waits in the middle until Play is pressed
+  // during its intro the boss only arrives; it is held still rather than start anything else
+  if (intro && !introLetsBossMove(boss.state)) { storm.update(dt, camYaw + Math.PI); return; }
   const ev = boss.update(dt, player, playing && invuln <= 0);
   const bounce = () => { player.velY = 9; player.onGround = false; };
   if (ev.caught) getHurt(ev.caught);
@@ -422,6 +524,7 @@ function loop() { frame(Math.min(clock.getDelta(), 1 / 30)); }
 // One step of the game. Split from loop() so tests can step it by hand (__game.frame).
 function frame(dt) {
   t += dt;
+  if (intro) stepIntro(dt);
   const playing = state === 'play';
 
   // movement relative to camera
@@ -554,13 +657,8 @@ function frame(dt) {
     sfx.pickup(collected);
     toast(collected === TOTAL ? (boss ? world.boss.text.wake : 'All the pebbles!') : `+1 · ${got.hint}`);
     if (collected === TOTAL && boss) {
-      // boss level: the last pebble brings the boss out
-      if (boss.emerge()) {
-        drawBoss();
-        if (world.boss.kind === 'falcon') sfx.screech();
-        else if (world.boss.kind === 'cat') sfx.meow();
-        else { dust.puff(boss.pos, 40, 3.5); sfx.thunder(); sfx.hiss(); }
-      }
+      // boss level: the last pebble brings the boss out, with its intro
+      startIntro();
     } else if (collected === TOTAL) {
       state = 'win';
       sfx.win();
@@ -606,19 +704,22 @@ function frame(dt) {
   const hit = world.solids.length ? camRay.intersectObjects(world.solids, true)[0] : null;
   if (hit) {
     want.copy(camTarget).addScaledVector(camDir, Math.max(0.3, hit.distance - 0.3));
-    camera.position.copy(want); // snap: easing in would slide through the rock
+    gameCam.copy(want); // snap: easing in would slide through the rock
   } else {
-    camera.position.lerp(want, Math.min(1, dt * 14));
+    gameCam.lerp(want, Math.min(1, dt * 14));
   }
+  camera.position.copy(gameCam);
   camera.lookAt(camTarget);
+  const onBoss = intro ? introView(dt) > 0.5 : false; // the boss intro takes the picture over
 
-  // shadow camera follows the lizard
-  sun.position.copy(player.pos).addScaledVector(SUN_DIR, 80);
-  sun.target.position.copy(player.pos);
+  // shadow camera follows the lizard (or the boss, while its intro is on it)
+  const lit = onBoss ? boss.pos : player.pos;
+  sun.position.copy(lit).addScaledVector(SUN_DIR, 80);
+  sun.target.position.copy(lit);
 
   flip.render(scene, camera);
 }
 
 init();
 // handy for debugging / testing in the console
-window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = v; }, set camPitch(v) { camPitch = v; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, get boss() { return boss; }, get storm() { return storm; }, get flip() { return flip; }, setFlipped, start, frame };
+window.__game = { get player() { return player; }, get pebbles() { return pebbles; }, get camYaw() { return camYaw; }, set camYaw(v) { camYaw = v; }, set camPitch(v) { camPitch = v; }, get keys() { return keys; }, get tarantulas() { return tarantulas; }, get hearts() { return hearts; }, get tail() { return tail; }, get level() { return world; }, get state() { return state; }, get boss() { return boss; }, get intro() { return intro; }, skipIntro, get storm() { return storm; }, get flip() { return flip; }, setFlipped, start, frame };
